@@ -29,29 +29,46 @@ jobs:
             whoami
             echo "HOME=$HOME"
 
-            if [ ! -d "$HOME/Agentic-AI/.git" ]; then
-              echo "ERROR: $HOME/Agentic-AI is not a Git checkout."
-              echo "Run once on the VPS:"
-              echo "  cd ~"
-              echo "  git clone https://github.com/wroxtaaar/Agentic-AI.git Agentic-AI"
+            if ! command -v docker >/dev/null 2>&1; then
+              echo "ERROR: Docker is not installed on this VPS."
               exit 1
+            fi
+
+            if ! docker compose version >/dev/null 2>&1; then
+              echo "ERROR: Docker Compose plugin is not available."
+              exit 1
+            fi
+
+            if [ ! -d "$HOME/Agentic-AI/.git" ]; then
+              if [ -e "$HOME/Agentic-AI" ]; then
+                echo "ERROR: $HOME/Agentic-AI exists but is not a Git checkout."
+                echo "Move or remove that directory, then retry."
+                exit 1
+              fi
+
+              echo "==> First deployment: cloning repository"
+              git clone https://github.com/wroxtaaar/Agentic-AI.git "$HOME/Agentic-AI"
             fi
 
             cd "$HOME/Agentic-AI"
-
-            if [ ! -f .env ]; then
-              echo "ERROR: $HOME/Agentic-AI/.env is missing."
-              echo "Create it once from .env.example and add your secrets."
-              exit 1
-            fi
 
             echo "==> Updating repository"
             git fetch origin main
             git checkout main
             git reset --hard origin/main
 
-            echo "==> Validating source"
+            if [ ! -f .env ]; then
+              echo "==> Creating initial .env"
+              cp .env.example .env
+              echo "ERROR: $HOME/Agentic-AI/.env was just created from .env.example."
+              echo "Add your production secrets to .env, then rerun the workflow."
+              exit 1
+            fi
+
+            echo "==> Validating Compose configuration"
             docker compose config
+
+            echo "==> Building image"
             docker compose build --pull
 
             echo "==> Running tests in the image"
