@@ -10,16 +10,16 @@ def _run(args, timeout=20):
         return {"success": False, "error": str(e)}
 
 def list_containers():
-    return _run(["ps", "--format", "table {{.Names}}\\t{{.Image}}\\t{{.Status}}\\t{{.Ports}}"])
+    return _run(["ps", "--format", "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"])
 
 def logs(container, lines=100):
     return _run(["logs", "--tail", str(max(1, min(int(lines), 500))), container])
 
 def inspect(container):
-    return _run(["inspect", "--format", "Name={{.Name}}\\nImage={{.Config.Image}}\\nStatus={{.State.Status}}\\nStartedAt={{.State.StartedAt}}\\nRestartCount={{.RestartCount}}", container])
+    return _run(["inspect", "--format", "Name={{.Name}}\nImage={{.Config.Image}}\nStatus={{.State.Status}}\nStartedAt={{.State.StartedAt}}\nRestartCount={{.RestartCount}}", container])
 
 def stats(container):
-    return _run(["stats", "--no-stream", "--format", "table {{.Name}}\\t{{.CPUPerc}}\\t{{.MemUsage}}\\t{{.MemPerc}}\\t{{.NetIO}}\\t{{.BlockIO}}", container])
+    return _run(["stats", "--no-stream", "--format", "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}", container])
 
 def _action(action, container):
     container = container.strip()
