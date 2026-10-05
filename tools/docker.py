@@ -1,5 +1,4 @@
 import subprocess
-import time
 from .safety import redact
 from core.approvals import create
 
@@ -11,16 +10,16 @@ def _run(args, timeout=20):
         return {"success": False, "error": str(e)}
 
 def list_containers():
-    return _run(["ps", "--format", "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"])
+    return _run(["ps", "--format", "table {{.Names}}\\t{{.Image}}\\t{{.Status}}\\t{{.Ports}}"])
 
 def logs(container, lines=100):
     return _run(["logs", "--tail", str(max(1, min(int(lines), 500))), container])
 
 def inspect(container):
-    return _run(["inspect", "--format", "Name={{.Name}}\nImage={{.Config.Image}}\nStatus={{.State.Status}}\nHealth={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}\nStartedAt={{.State.StartedAt}}\nRestartCount={{.RestartCount}}", container])
+    return _run(["inspect", "--format", "Name={{.Name}}\\nImage={{.Config.Image}}\\nStatus={{.State.Status}}\\nHealth={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}\\nStartedAt={{.State.StartedAt}}\\nRestartCount={{.RestartCount}}", container])
 
 def stats(container):
-    return _run(["stats", "--no-stream", "--format", "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}", container])
+    return _run(["stats", "--no-stream", "--format", "table {{.Name}}\\t{{.CPUPerc}}\\t{{.MemUsage}}\\t{{.MemPerc}}\\t{{.NetIO}}\\t{{.BlockIO}}", container])
 
 def _action(action, container):
     container = container.strip()
@@ -40,14 +39,14 @@ def propose_start(container):
 def propose_stop(container):
     return _action("stop", container)
 
-def verify_container(container):
+def verify_container(container, expected_status="running"):
     container = container.strip()
     if not container or any(c in container for c in " ;|&$"):
         return {"success": False, "error": "Invalid container name"}
 
     result = _run([
         "inspect", "--format",
-        "Status={{.State.Status}}\nHealth={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}\nRestartCount={{.RestartCount}}",
+        "Status={{.State.Status}}\\nHealth={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}\\nRestartCount={{.RestartCount}}",
         container,
     ])
 
@@ -62,30 +61,29 @@ def verify_container(container):
 
     status = values.get("Status", "")
     health = values.get("Health", "none")
-    running = status == "running"
+    status_ok = status == expected_status
+    health_ok = expected_status == "exited" or health in {"none", "healthy"}
 
-    # A container without a Docker HEALTHCHECK is still valid when running.
-    healthy = health in {"none", "healthy"}
-    if not running or not healthy:
+    if not status_ok or not health_ok:
         return {
             "success": False,
             "status": status,
+            "expected_status": expected_status,
             "health": health,
             "restart_count": values.get("RestartCount"),
-            "error": "Container is not running/healthy after the approved action",
+            "error": "Container did not reach the expected post-action state",
         }
 
     return {
         "success": True,
         "status": status,
+        "expected_status": expected_status,
         "health": health,
         "restart_count": values.get("RestartCount"),
         "verified": True,
     }
 
 def execute_action(action, container):
-    if action == "verify":
-        return verify_container(container)
     if action not in {"restart", "start", "stop"}:
         return {"success": False, "error": "Unsupported Docker action"}
     return _run([action, container], 30)
