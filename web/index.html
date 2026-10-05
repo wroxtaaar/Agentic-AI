@@ -92,7 +92,20 @@ async function loadStatus(){
 async function loadApprovals(){
  try{const x=await api('/api/approvals');const a=x.approvals||[];$('approvals').innerHTML=a.length?a.map(v=>'<div class="approval"><strong>'+esc(v.description)+'</strong><div class="sub">'+esc(v.kind)+' · '+new Date(v.created_at).toLocaleString()+'</div><div class="sub">'+esc(JSON.stringify(v.payload))+'</div><div class="actions"><button class="approve" onclick="approve(\''+esc(v.id)+'\')">Approve</button><button class="reject" onclick="reject(\''+esc(v.id)+'\')">Reject</button></div></div>').join(''):'<div class="empty">No pending actions</div>'}catch(e){$('approvals').innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
 }
-async function approve(id){try{await api('/api/approvals/'+id+'/approve',{method:'POST'});await api('/api/actions/docker/'+id+'/execute',{method:'POST'});await loadApprovals();await loadStatus();add('Action approved and executed.','agent')}catch(e){alert(e.message)}}
+async function approve(id){
+ try{
+  await api('/api/approvals/'+id+'/approve',{method:'POST'});
+  const x=await api('/api/actions/'+id+'/execute',{method:'POST'});
+  await loadApprovals();await loadStatus();
+  const v=x.verification;
+  add(v&&v.verified
+    ? 'Action executed and verified: '+(x.container||x.kind)+' is '+(v.status||'in the expected state')+(v.health&&v.health!=='none'?' · health: '+v.health:'')
+    : 'Action executed successfully.','agent');
+ }catch(e){
+  await loadApprovals();await loadStatus();
+  add('Action failed or verification failed: '+e.message,'agent');
+ }
+}
 async function reject(id){try{await api('/api/approvals/'+id+'/reject',{method:'POST'});await loadApprovals()}catch(e){alert(e.message)}}
 function add(text,kind,meta=''){const c=$('chat');const empty=c.querySelector('.empty');if(empty)empty.remove();const d=document.createElement('div');d.className='msg '+kind;d.textContent=text;if(meta){const m=document.createElement('div');m.className='meta';m.textContent=meta;d.append(m)}c.append(d);c.scrollTop=c.scrollHeight}
 $('form').onsubmit=async e=>{e.preventDefault();const m=$('q').value.trim();if(!m)return;add(m,'user');$('q').value='';add('Working…','agent');const wait=$('chat').lastChild;try{const x=await api('/api/chat',{method:'POST',body:JSON.stringify({message:m})});wait.remove();add(x.answer||'No response','agent',(x.specialists||[]).join(' · '));$('agents').textContent=(x.specialists||[]).join(' · ')||'Ready';await loadApprovals();await loadStatus()}catch(err){wait.remove();add(err.message,'agent')}}
