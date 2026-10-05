@@ -36,11 +36,16 @@ def run_command(command: str) -> dict:
     if dangerous:
         return {"success": False, "error": f"Unsafe find options are not allowed: {', '.join(dangerous)}"}
 
-    if executable in {"ls", "find"}:
+    if executable == "ls":
         path_args = [p for p in parts[1:] if not p.startswith("-")]
         for value in path_args:
             if not _safe_path(value):
                 return {"success": False, "error": f"Path is outside configured workspace: {value}"}
+
+    if executable == "find":
+        start = parts[1] if len(parts) > 1 and not parts[1].startswith("-") else "."
+        if not _safe_path(start):
+            return {"success": False, "error": f"Path is outside configured workspace: {start}"}
 
     try:
         result = subprocess.run(parts, capture_output=True, text=True, timeout=15)
