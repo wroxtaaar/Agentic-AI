@@ -7,10 +7,10 @@ from pydantic import BaseModel, Field
 from core.orchestrator import Orchestrator
 from core.approvals import list_pending, get, set_status, create
 from tools.patches import approve, apply
-from tools.docker import execute_action
 from tools.system import info
 from tools.projects import discover
 from tools.docker import list_containers
+from tools.actions import execute_approved
 
 load_dotenv()
 app=FastAPI(title='Oracle VPS Agent',version='1.0.0')
@@ -57,6 +57,7 @@ def approval_approve(aid:str,authorization:str|None=Header(default=None)):
     auth(authorization)
     item=get(aid)
     if not item: raise HTTPException(404,'Approval not found')
+    if item.get('status')!='pending': raise HTTPException(400,'Approval is not pending')
     return set_status(aid,'approved')
 
 @app.post('/api/approvals/{aid}/reject')
@@ -64,6 +65,7 @@ def approval_reject(aid:str,authorization:str|None=Header(default=None)):
     auth(authorization)
     item=get(aid)
     if not item: raise HTTPException(404,'Approval not found')
+    if item.get('status')!='pending': raise HTTPException(400,'Approval is not pending')
     return set_status(aid,'rejected')
 
 @app.post('/api/proposals/{pid}/approve')
@@ -85,22 +87,21 @@ def restart_container(req:RestartRequest,authorization:str|None=Header(default=N
     auth(authorization)
     return create('container_restart',f'Restart Docker container {req.container}',{'container':req.container})
 
+@app.post('/api/actions/{aid}/execute')
+def execute_approved_action(aid:str,authorization:str|None=Header(default=None)):
+    auth(authorization)
+    result=execute_approved(aid)
+    if not result.get('success'):
+        error=result.get('error','Approved action failed')
+        if result.get('approval_id') and result.get('verification'):
+            raise HTTPException(502,result)
+        raise HTTPException(400,error)
+    return result
+
+# Backward-compatible Docker endpoint for existing clients.
 @app.post('/api/actions/docker/{aid}/execute')
 def execute_docker_action(aid:str,authorization:str|None=Header(default=None)):
-    auth(authorization)
-    item=get(aid)
-    if not item: raise HTTPException(404,'Approval not found')
-    if item.get('kind') not in {'docker_restart','docker_start','docker_stop'}:
-        raise HTTPException(400,'Approval is not a Docker action')
-    if item.get('status')!='approved':
-        raise HTTPException(400,'Approval is not approved')
-    action=item['payload'].get('action')
-    container=item['payload'].get('container')
-    result=execute_action(action,container)
-    if not result.get('success'):
-        raise HTTPException(502,result.get('stderr') or result.get('error') or 'Docker action failed')
-    set_status(aid,'executed')
-    return {'success':True,'approval_id':aid,'action':action,'container':container,'result':result}
+    return execute_approved_action(aid,authorization)
 
 @app.get('/',include_in_schema=False)
 def index(): return FileResponse(Path(__file__).parent/'web'/'index.html')
