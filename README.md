@@ -14,7 +14,7 @@ A self-hosted multi-agent engineering control plane for managing software projec
 - **Verification Agent** — runs post-change checks.
 - **Memory Agent** — stores durable non-secret project facts.
 
-The current specialist layer is prompt/routing based; the next architecture step is to turn these roles into explicit worker agents with task handoffs and isolated tool permissions.
+Specialists are routed by the orchestrator and operate through a shared, approval-aware tool layer. Read-only investigation is automatic; mutations are represented as durable approval records and executed only after explicit approval. Docker actions include post-action verification.
 
 ## Safety model
 
@@ -57,8 +57,9 @@ Use Tailscale or another private network for access. Do not expose the raw contr
 - POST /api/approvals/{id}/reject
 - POST /api/proposals/{id}/approve
 - POST /api/proposals/{id}/apply
-- POST /api/actions/restart-container — creates a restart approval
-- POST /api/actions/restart-container/{approval_id}/execute — executes an approved restart
+- POST /api/actions/{id}/execute — executes any approved supported action
+- POST /api/actions/docker/{id}/execute — backward-compatible Docker executor
+- POST /api/actions/restart-container — legacy restart proposal endpoint
 
 ## Example tasks
 
@@ -67,4 +68,4 @@ Use Tailscale or another private network for access. Do not expose the raw contr
 - Fix the crash in FinanceSMSTracker and prepare a patch.
 - Check Docker containers and find anything using too much memory.
 
-The agent investigates first, presents evidence, and requires approval before mutations.
+The agent investigates first, presents evidence, and requires approval before mutations. Docker start/restart/stop, Git commits, durable memory writes, and exact source patches are approval-gated. Approved Docker actions are verified after execution. The control plane is intended to remain private behind Tailscale or another trusted network.
