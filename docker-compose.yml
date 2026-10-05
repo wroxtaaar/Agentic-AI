@@ -1,10 +1,26 @@
 services:
   agent:
-    build: .
-    env_file: .env
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agentic-ai
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      AGENT_WORKSPACE_ROOTS: /home/ubuntu
     ports:
       - "127.0.0.1:8787:8787"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /home/ubuntu:/home/ubuntu
-    restart: unless-stopped
+      - agentic-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  agentic-data:
