@@ -1,9 +1,9 @@
-import hashlib,json,secrets
+import hashlib,json,os,secrets
 from pathlib import Path
 from .safety import sensitive,within
 from core.approvals import create,get,set_status
 ROOT=Path(__file__).resolve().parent.parent
-PROPOSALS=ROOT/'proposals'
+PROPOSALS=Path(os.getenv('AGENT_PROPOSALS_DIR','/data/proposals'))
 PROPOSALS.mkdir(exist_ok=True)
 
 def sha(p): return hashlib.sha256(p.read_bytes()).hexdigest()
