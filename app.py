@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from core.orchestrator import Orchestrator
 from core.approvals import list_pending, get, set_status, create
 from tools.patches import approve, apply
-from tools.docker import restart
+from tools.docker import execute_action
 from tools.system import info
 from tools.projects import discover
 from tools.docker import list_containers
@@ -85,18 +85,22 @@ def restart_container(req:RestartRequest,authorization:str|None=Header(default=N
     auth(authorization)
     return create('container_restart',f'Restart Docker container {req.container}',{'container':req.container})
 
-@app.post('/api/actions/restart-container/{aid}/execute')
-def execute_restart(aid:str,authorization:str|None=Header(default=None)):
+@app.post('/api/actions/docker/{aid}/execute')
+def execute_docker_action(aid:str,authorization:str|None=Header(default=None)):
     auth(authorization)
     item=get(aid)
     if not item: raise HTTPException(404,'Approval not found')
-    if item.get('kind')!='container_restart': raise HTTPException(400,'Approval is not a container restart')
-    if item.get('status')!='approved': raise HTTPException(400,'Approval is not approved')
-    result=restart(item['payload']['container'])
+    if item.get('kind') not in {'docker_restart','docker_start','docker_stop'}:
+        raise HTTPException(400,'Approval is not a Docker action')
+    if item.get('status')!='approved':
+        raise HTTPException(400,'Approval is not approved')
+    action=item['payload'].get('action')
+    container=item['payload'].get('container')
+    result=execute_action(action,container)
     if not result.get('success'):
-        raise HTTPException(502,result.get('stderr') or result.get('error') or 'Container restart failed')
+        raise HTTPException(502,result.get('stderr') or result.get('error') or 'Docker action failed')
     set_status(aid,'executed')
-    return {'success':True,'approval_id':aid,'container':item['payload']['container'],'result':result}
+    return {'success':True,'approval_id':aid,'action':action,'container':container,'result':result}
 
 @app.get('/',include_in_schema=False)
 def index(): return FileResponse(Path(__file__).parent/'web'/'index.html')
