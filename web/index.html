@@ -1,1 +1,104 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Oracle VPS Agent</title><style>body{margin:auto;max-width:1000px;padding:16px;font-family:system-ui;background:#0d0f12;color:#eee}#chat{height:65vh;overflow:auto;border:1px solid #333;border-radius:14px;padding:12px}.m{white-space:pre-wrap;padding:12px;margin:8px 0;border-radius:12px}.u{background:#19324a}.a{background:#1d2a20}.t{color:#999;font-size:12px}form{display:flex;gap:8px;margin-top:10px}textarea,input{background:#15171a;color:#fff;border:1px solid #444;border-radius:10px;padding:10px;box-sizing:border-box}textarea{flex:1;min-height:70px}button{border:0;border-radius:10px;padding:10px 16px;font-weight:700}#token{width:100%;margin:8px 0}</style></head><body><h2>Oracle VPS Agent</h2><div id="status">Multi-agent VPS control plane</div><input id="token" type="password" placeholder="AGENT_API_TOKEN"><div id="chat"></div><form><textarea id="q" placeholder="Ask the agent to inspect, diagnose or plan work..."></textarea><button>Send</button></form><script>const c=document.querySelector('#chat'),q=document.querySelector('#q'),t=document.querySelector('#token');function add(x,k){let d=document.createElement('div');d.className='m '+k;d.textContent=x;c.append(d);c.scrollTop=c.scrollHeight}document.querySelector('form').onsubmit=async e=>{e.preventDefault();let m=q.value.trim();if(!m)return;add(m,'u');q.value='';add('Working…','a');let wait=c.lastChild;try{let r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+t.value},body:JSON.stringify({message:m})});let x=await r.json();wait.remove();add(x.answer||x.detail||'No response','a');if(x.specialists)add('Agents: '+x.specialists.join(', '),'t')}catch(e){wait.remove();add(String(e),'a')}};</script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0d10">
+<title>Agentic AI</title>
+<style>
+:root{--bg:#080a0d;--panel:#111419;--panel2:#171a20;--line:#272c34;--text:#f3f5f7;--muted:#8e98a6;--accent:#7c9cff;--good:#55d68a;--warn:#f4c95d;--bad:#ff6b78}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button,input,textarea{font:inherit}button{cursor:pointer}.app{max-width:1180px;margin:auto;padding:18px 16px 100px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}.brand{display:flex;align-items:center;gap:11px}.logo{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#7c9cff,#a879ff);display:grid;place-items:center;font-weight:900;color:#fff}.brand h1{font-size:18px;margin:0}.brand p{margin:2px 0 0;color:var(--muted);font-size:12px}
+.iconbtn{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:11px;padding:9px 12px}
+.grid{display:grid;grid-template-columns:1.45fr .85fr;gap:14px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden}.panelhead{padding:14px 15px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}.panelhead h2{font-size:14px;margin:0}.muted{color:var(--muted);font-size:12px}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;padding:12px}.stat{background:var(--panel2);border-radius:12px;padding:12px}.stat b{display:block;font-size:22px}.stat span{color:var(--muted);font-size:11px}
+#chat{height:430px;overflow:auto;padding:12px}.msg{max-width:90%;padding:11px 13px;border-radius:14px;margin:8px 0;white-space:pre-wrap;line-height:1.45;font-size:13px}.user{margin-left:auto;background:#233a67}.agent{background:var(--panel2);border:1px solid var(--line)}.meta{font-size:10px;color:var(--muted);margin-top:6px}
+.composer{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line)}textarea{flex:1;resize:none;min-height:46px;max-height:130px;background:#0b0d10;color:var(--text);border:1px solid var(--line);border-radius:12px;padding:12px;outline:none}textarea:focus{border-color:var(--accent)}.send{background:var(--accent);color:white;border:0;border-radius:12px;padding:0 17px;font-weight:700}
+.list{padding:8px 10px}.row{padding:11px 5px;border-bottom:1px solid #20242b;display:flex;justify-content:space-between;gap:10px;align-items:center}.row:last-child{border:0}.name{font-size:13px;font-weight:650}.sub{font-size:11px;color:var(--muted);margin-top:3px}.pill{font-size:10px;padding:4px 7px;border-radius:999px;background:#20252d;color:var(--muted);white-space:nowrap}.good{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+.approval{padding:12px;margin:9px 10px;background:var(--panel2);border:1px solid #303641;border-radius:12px}.approval strong{font-size:13px}.actions{display:flex;gap:7px;margin-top:9px}.actions button{border:0;border-radius:9px;padding:7px 10px;font-size:11px;font-weight:700}.approve{background:var(--good);color:#07130c}.reject{background:#292e36;color:#fff}
+.token{display:none;padding:12px 14px;background:#101318;border:1px solid var(--line);border-radius:12px;margin-bottom:14px}.token input{width:100%;background:#080a0d;color:#fff;border:1px solid var(--line);border-radius:9px;padding:10px}
+.empty{padding:20px;text-align:center;color:var(--muted);font-size:12px}.refresh{font-size:11px;color:var(--accent);background:none;border:0}
+@media(max-width:760px){.app{padding:12px 10px 80px}.grid{grid-template-columns:1fr}.cards{grid-template-columns:repeat(3,1fr)}#chat{height:48vh}.panelhead{padding:12px}.brand h1{font-size:16px}.stat{padding:10px}.stat b{font-size:19px}.msg{max-width:94%}}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+ <div class="brand"><div class="logo">AI</div><div><h1>Agentic AI</h1><p>Oracle VPS control plane</p></div></div>
+ <button class="iconbtn" id="tokenBtn">🔐 Token</button>
+</header>
+
+<div class="token" id="tokenBox"><input id="token" type="password" placeholder="AGENT_API_TOKEN"></div>
+
+<div class="grid">
+<main>
+<section class="panel">
+ <div class="panelhead"><h2>VPS Overview</h2><button class="refresh" id="refresh">Refresh</button></div>
+ <div class="cards">
+  <div class="stat"><b id="health">—</b><span>VPS</span></div>
+  <div class="stat"><b id="containers">—</b><span>Containers</span></div>
+  <div class="stat"><b id="projects">—</b><span>Projects</span></div>
+ </div>
+</section>
+
+<section class="panel" style="margin-top:14px">
+ <div class="panelhead"><h2>AI Operator</h2><span class="muted" id="agents">Ready</span></div>
+ <div id="chat"><div class="empty">Ask the agent to inspect, diagnose, plan or operate your VPS.</div></div>
+ <form class="composer" id="form"><textarea id="q" placeholder="e.g. Why is finance-api unhealthy?"></textarea><button class="send">Send</button></form>
+</section>
+</main>
+
+<aside>
+<section class="panel">
+ <div class="panelhead"><h2>Pending approvals</h2><button class="refresh" id="approvalRefresh">Refresh</button></div>
+ <div id="approvals"><div class="empty">No pending actions</div></div>
+</section>
+
+<section class="panel" style="margin-top:14px">
+ <div class="panelhead"><h2>Containers</h2></div>
+ <div class="list" id="containerList"><div class="empty">Load status to view containers</div></div>
+</section>
+
+<section class="panel" style="margin-top:14px">
+ <div class="panelhead"><h2>Projects</h2></div>
+ <div class="list" id="projectList"><div class="empty">Load status to view projects</div></div>
+</section>
+</aside>
+</div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const token=$('token');
+token.value=localStorage.getItem('agent_token')||'';
+token.addEventListener('input',()=>localStorage.setItem('agent_token',token.value));
+$('tokenBtn').onclick=()=>{$('tokenBox').style.display=$('tokenBox').style.display==='block'?'none':'block';token.focus()};
+function headers(){return {'Content-Type':'application/json','Authorization':'Bearer '+token.value}}
+async function api(path,opts={}){opts.headers={...headers(),...(opts.headers||{})};const r=await fetch(path,opts);const x=await r.json().catch(()=>({detail:r.statusText}));if(!r.ok)throw new Error(x.detail||'Request failed');return x}
+function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+async function loadStatus(){
+ try{
+  const x=await api('/api/status'); const c=x.containers?.stdout||''; 
+  $('health').textContent='ONLINE';$('health').className='good';
+  $('containers').textContent=x.containers?.success?((c.match(/\n/g)||[]).length):'—';
+  $('projects').textContent=x.projects?.count??'—';
+  const lines=c.split('\n').filter(Boolean).slice(1);
+  $('containerList').innerHTML=lines.length?lines.map(l=>{const a=l.trim().split(/\s+/);return '<div class="row"><div><div class="name">'+esc(a[0])+'</div><div class="sub">'+esc(a[1]||'')+'</div></div><span class="pill good">'+esc(a[2]||'running')+'</span></div>'}).join(''):'<div class="empty">No containers</div>';
+  const ps=x.projects?.projects||[];
+  $('projectList').innerHTML=ps.slice(0,12).map(p=>'<div class="row"><div><div class="name">'+esc(p.name)+'</div><div class="sub">'+esc(p.path)+'</div></div></div>').join('')||'<div class="empty">No projects</div>';
+ }catch(e){$('health').textContent='OFFLINE';$('health').className='bad'}
+}
+async function loadApprovals(){
+ try{const x=await api('/api/approvals');const a=x.approvals||[];$('approvals').innerHTML=a.length?a.map(v=>'<div class="approval"><strong>'+esc(v.description)+'</strong><div class="sub">'+esc(v.kind)+' · '+new Date(v.created_at).toLocaleString()+'</div><div class="sub">'+esc(JSON.stringify(v.payload))+'</div><div class="actions"><button class="approve" onclick="approve(\''+esc(v.id)+'\')">Approve</button><button class="reject" onclick="reject(\''+esc(v.id)+'\')">Reject</button></div></div>').join(''):'<div class="empty">No pending actions</div>'}catch(e){$('approvals').innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
+}
+async function approve(id){try{await api('/api/approvals/'+id+'/approve',{method:'POST'});await api('/api/actions/docker/'+id+'/execute',{method:'POST'});await loadApprovals();await loadStatus();add('Action approved and executed.','agent')}catch(e){alert(e.message)}}
+async function reject(id){try{await api('/api/approvals/'+id+'/reject',{method:'POST'});await loadApprovals()}catch(e){alert(e.message)}}
+function add(text,kind,meta=''){const c=$('chat');const empty=c.querySelector('.empty');if(empty)empty.remove();const d=document.createElement('div');d.className='msg '+kind;d.textContent=text;if(meta){const m=document.createElement('div');m.className='meta';m.textContent=meta;d.append(m)}c.append(d);c.scrollTop=c.scrollHeight}
+$('form').onsubmit=async e=>{e.preventDefault();const m=$('q').value.trim();if(!m)return;add(m,'user');$('q').value='';add('Working…','agent');const wait=$('chat').lastChild;try{const x=await api('/api/chat',{method:'POST',body:JSON.stringify({message:m})});wait.remove();add(x.answer||'No response','agent',(x.specialists||[]).join(' · '));$('agents').textContent=(x.specialists||[]).join(' · ')||'Ready';await loadApprovals();await loadStatus()}catch(err){wait.remove();add(err.message,'agent')}}
+$('refresh').onclick=loadStatus;$('approvalRefresh').onclick=loadApprovals;
+loadStatus();loadApprovals();
+setInterval(()=>{loadStatus();loadApprovals()},15000);
+</script>
+</body>
+</html>
