@@ -1,7 +1,7 @@
 from tools.system import info
 from tools.shell import run
 from tools.projects import discover,read_file,structure
-from tools.docker import list_containers,logs,inspect,stats
+from tools.docker import list_containers,logs,inspect,stats,propose_restart,propose_start,propose_stop
 from tools.git import status,branch,log,diff
 from tools.patches import propose
 from tools.memory import save as memory_save, search as memory_search
@@ -20,6 +20,9 @@ def build_tools():
       t('docker_logs','Read recent container logs.',logs,{'container':{'type':'string'},'lines':{'type':'integer'}},['container']),
       t('docker_inspect','Inspect one Docker container.',inspect,{'container':{'type':'string'}},['container']),
       t('docker_stats','Read one-shot Docker resource usage.',stats,{'container':{'type':'string'}},['container']),
+      t('docker_restart','PROPOSAL ONLY: request approval to restart a Docker container. Does not restart it.',propose_restart,{'container':{'type':'string'}},['container']),
+      t('docker_start','PROPOSAL ONLY: request approval to start a Docker container. Does not start it.',propose_start,{'container':{'type':'string'}},['container']),
+      t('docker_stop','PROPOSAL ONLY: request approval to stop a Docker container. Does not stop it.',propose_stop,{'container':{'type':'string'}},['container']),
       t('git_status','Show repository status.',status,{'path':{'type':'string'}},['path']),
       t('git_branch','Show current branch.',branch,{'path':{'type':'string'}},['path']),
       t('git_log','Show recent commits.',log,{'path':{'type':'string'},'count':{'type':'integer'}},['path']),
