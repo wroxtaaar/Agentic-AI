@@ -23,6 +23,7 @@ def execute_approved(aid):
 
         result = execute_action(action, container)
         if not result.get("success"):
+            set_status(aid, "failed")
             return {
                 "success": False,
                 "approval_id": aid,
