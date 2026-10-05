@@ -1,8 +1,15 @@
 FROM python:3.12-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1     PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
 WORKDIR /app
+
+# The agent talks to the host Docker daemon through the mounted
+# /var/run/docker.sock, so the Docker CLI must exist in the container.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends docker.io \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
@@ -13,6 +20,7 @@ RUN mkdir -p /data
 
 EXPOSE 8787
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=5   CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=5)"
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=5 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=5)"
 
 CMD ["python", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8787"]
