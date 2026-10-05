@@ -1,7 +1,7 @@
 import time
 
 from core.approvals import get, set_status
-from tools.docker import execute_action
+from tools.docker import execute_action, verify_container
 
 
 DOCKER_KINDS = {"docker_restart", "docker_start", "docker_stop"}
@@ -32,9 +32,14 @@ def execute_approved(aid):
                 "result": result,
             }
 
-        # Give Docker a moment to finish a restart/start before verification.
-        time.sleep(2)
-        verification = execute_action("verify", container)
+        expected_status = "exited" if action == "stop" else "running"
+        verification = {"success": False, "error": "Verification did not complete"}
+        for attempt in range(5):
+            verification = verify_container(container, expected_status=expected_status)
+            if verification.get("success"):
+                break
+            if attempt < 4:
+                time.sleep(2)
 
         if not verification.get("success"):
             set_status(aid, "failed")
