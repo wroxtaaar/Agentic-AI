@@ -4,7 +4,7 @@ from .safety import sensitive,within
 from core.approvals import create,get,set_status
 ROOT=Path(__file__).resolve().parent.parent
 PROPOSALS=Path(os.getenv('AGENT_PROPOSALS_DIR','/data/proposals'))
-PROPOSALS.mkdir(exist_ok=True)
+PROPOSALS.mkdir(parents=True,exist_ok=True)
 
 def sha(p): return hashlib.sha256(p.read_bytes()).hexdigest()
 
@@ -43,9 +43,7 @@ def approve(pid):
     approval=get(p.get('approval_id',''))
     if not approval: return {'success':False,'error':'Approval record not found'}
     if approval.get('status')!='approved': return {'success':False,'error':'Approval must be approved through the approval queue first'}
-    p['status']='approved'
-    save(p)
-    return p
+    p['status']='approved'; save(p); return p
 
 def apply(pid):
     p=load(pid)
@@ -58,15 +56,20 @@ def apply(pid):
         if sha(target)!=p['hashes'][e['file']]:
             return {'success':False,'error':f'Changed since proposal: {e["file"]}'}
     backups=[]
-    for e in p['edits']:
-        target=(Path(p['project'])/e['file']).resolve()
-        content=target.read_text(encoding='utf-8')
-        backup=target.with_name(target.name+'.backup-'+secrets.token_hex(4))
-        backup.write_text(content,encoding='utf-8')
-        backups.append(str(backup))
-        target.write_text(content.replace(e['old_text'],e['new_text']),encoding='utf-8')
-    p['status']='applied'
-    p['backups']=backups
-    save(p)
+    try:
+        for e in p['edits']:
+            target=(Path(p['project'])/e['file']).resolve()
+            content=target.read_text(encoding='utf-8')
+            backup=target.with_name(target.name+'.backup-'+secrets.token_hex(4))
+            backup.write_text(content,encoding='utf-8')
+            backups.append(str(backup))
+            target.write_text(content.replace(e['old_text'],e['new_text']),encoding='utf-8')
+    except Exception as exc:
+        for e,backup in zip(p['edits'],backups):
+            target=(Path(p['project'])/e['file']).resolve()
+            try: target.write_text(Path(backup).read_text(encoding='utf-8'),encoding='utf-8')
+            except Exception: pass
+        return {'success':False,'error':f'Patch application failed and rollback was attempted: {exc}'}
+    p['status']='applied'; p['backups']=backups; save(p)
     set_status(approval['id'],'executed')
     return {'success':True,'proposal_id':pid,'approval_id':approval['id'],'backups':backups,'verification_required':True}
