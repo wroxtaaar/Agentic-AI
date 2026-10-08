@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from tools.audit import audit_project
 from tools.projects import read_files
@@ -20,7 +21,8 @@ class ProjectVerificationTests(unittest.TestCase):
             root = Path(tmp)
             (root / ".git").mkdir()
             (root / "build.gradle.kts").write_text("plugins {}")
-            result = audit_project(str(root))
+            with patch("tools.audit.roots", return_value=[root]):
+                result = audit_project(str(root))
             self.assertTrue(result["success"])
             self.assertIn("git", result)
             self.assertIsNone(result["git"]["dirty"])
@@ -35,9 +37,10 @@ class ProjectVerificationTests(unittest.TestCase):
             b.write_text("beta")
             # The test helper uses the configured workspace, so this validates
             # the API shape independently of deployment configuration.
-            result = read_files([str(a), str(b)])
-            self.assertEqual(result["success"], False)
-            self.assertEqual(len(result["files"]), 2)
+            with patch("tools.projects.roots", return_value=[root]):
+                result = read_files([str(a), str(b)])
+            self.assertTrue(result["success"])
+            self.assertEqual([x["content"] for x in result["files"]], ["alpha", "beta"])
 
 
 if __name__ == "__main__":
