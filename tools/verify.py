@@ -1,15 +1,19 @@
 import json
+import os
 import subprocess
 from pathlib import Path
 
+from .projects import roots
 from .safety import redact
-
 
 IGNORE={'.git','.venv','venv','node_modules','build','dist','.gradle','__pycache__'}
 
+def _allowed(root):
+    return any(root == base or base in root.parents for base in roots())
 
 def python_syntax(path):
     root=Path(path).expanduser().resolve()
+    if not _allowed(root): return {'success':False,'error':'Project is outside configured workspace'}
     files=[str(x.relative_to(root)) for x in root.rglob('*.py')
            if not any(p in IGNORE for p in x.relative_to(root).parts)]
     if not files:
@@ -18,16 +22,15 @@ def python_syntax(path):
     return {'success':r.returncode==0,'check':'python_syntax','files':len(files),
             'stdout':redact(r.stdout),'stderr':redact(r.stderr),'return_code':r.returncode}
 
-
 def project_markers(path):
     root=Path(path).expanduser().resolve()
+    if not _allowed(root): return {'success':False,'error':'Project is outside configured workspace'}
     markers=[]
     if any((root/x).exists() for x in ('pyproject.toml','requirements.txt','setup.py')): markers.append('python')
     if (root/'package.json').exists(): markers.append('node')
     if (root/'pom.xml').exists(): markers.append('maven')
     if any((root/x).exists() for x in ('build.gradle','build.gradle.kts')): markers.append('gradle')
     return {'success':True,'project_type':markers[0] if len(markers)==1 else ('mixed' if markers else 'unknown'),'markers':markers}
-
 
 def _run(root, command, timeout):
     try:
@@ -40,10 +43,10 @@ def _run(root, command, timeout):
     except Exception as exc:
         return {'success':False,'command':' '.join(command),'error':str(exc)}
 
-
 def project_verify(path, mode='auto', timeout=180):
     root=Path(path).expanduser().resolve()
     if not root.is_dir(): return {'success':False,'error':'Project directory not found'}
+    if not _allowed(root): return {'success':False,'error':'Project is outside configured workspace'}
     timeout=max(10,min(int(timeout),600))
     if mode not in {'auto','syntax','test','build'}:
         return {'success':False,'error':'Unsupported verification mode'}
