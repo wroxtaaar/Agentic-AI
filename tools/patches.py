@@ -2,15 +2,21 @@ import hashlib,json,os,secrets
 from pathlib import Path
 from .safety import sensitive,within
 from core.approvals import create,get
+from tools.projects import roots
+
 ROOT=Path(__file__).resolve().parent.parent
 PROPOSALS=Path(os.getenv('AGENT_PROPOSALS_DIR','/data/proposals'))
 PROPOSALS.mkdir(parents=True,exist_ok=True)
 
 def sha(p): return hashlib.sha256(p.read_bytes()).hexdigest()
 
+def _allowed_project(root):
+    return any(root == base or base in root.parents for base in roots())
+
 def propose(project,problem,explanation,edits):
     root=Path(project).expanduser().resolve()
     if not root.is_dir(): return {'success':False,'error':'Project not found'}
+    if not _allowed_project(root): return {'success':False,'error':'Project is outside configured workspace'}
     if not isinstance(edits,list) or not edits: return {'success':False,'error':'At least one exact edit required'}
     if len(edits)>20: return {'success':False,'error':'Too many edits in one proposal'}
     normalized=[]; hashes={}
