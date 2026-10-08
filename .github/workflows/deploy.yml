@@ -66,7 +66,7 @@ jobs:
             fi
 
             echo "==> Validating Compose configuration"
-            docker compose config
+            docker compose config --quiet
 
             echo "==> Building image"
             docker compose build --pull
