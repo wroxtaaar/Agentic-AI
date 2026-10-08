@@ -1,6 +1,6 @@
 from tools.system import info
 from tools.shell import run
-from tools.projects import discover,read_file,structure
+from tools.projects import discover,read_file,read_files,structure
 from tools.audit import audit_project
 from tools.docker import list_containers,logs,inspect,stats,propose_restart,propose_start,propose_stop
 from tools.git import status,branch,log,diff
@@ -18,6 +18,7 @@ def build_tools():
       t('project_audit','Build an evidence-based audit of one project: project type, important files, Git state, scripts and wrappers. Read-only.',audit_project,{'path':{'type':'string'}},['path']),
       t('project_structure','Inspect a project without modifying it.',structure,{'path':{'type':'string'}},['path']),
       t('read_file','Read a non-secret project file with redaction.',read_file,{'path':{'type':'string'}},['path']),
+      t('read_files','Read up to 12 non-secret project files in one call. Prefer this over repeated read_file calls.',read_files,{'paths':{'type':'array','items':{'type':'string'}}},['paths']),
       t('shell_readonly','Run an allowlisted read-only shell command.',run,{'command':{'type':'string'}},['command']),
       t('docker_list','List running Docker containers.',list_containers),
       t('docker_logs','Read recent container logs.',logs,{'container':{'type':'string'},'lines':{'type':'integer'}},['container']),
