@@ -13,7 +13,8 @@ class ProjectVerificationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "package.json").write_text('{"name":"demo","scripts":{"test":"echo ok"}}')
-            result = project_markers(str(root))
+            with patch("tools.verify.roots", return_value=[root]):
+                result = project_markers(str(root))
             self.assertEqual(result["project_type"], "node")
 
     def test_audit_reports_git_failure_without_inventing_missing_git(self):
