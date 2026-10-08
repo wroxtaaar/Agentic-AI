@@ -1,8 +1,19 @@
 import os
 from pathlib import Path
 from .safety import sensitive
+
 IGNORE={'.git','.venv','venv','node_modules','__pycache__','.gradle','build','dist','.cache'}
-def roots(): return [Path(x).expanduser().resolve() for x in os.getenv('AGENT_WORKSPACE_ROOTS','/home/ubuntu').split(':') if x.strip()]
+
+def roots():
+    return [Path(x).expanduser().resolve() for x in os.getenv('AGENT_WORKSPACE_ROOTS','/home/ubuntu').split(':') if x.strip()]
+
+def _inside_workspace(path):
+    try:
+        p=path.resolve()
+    except OSError:
+        return False
+    return any(p == root or root in p.parents for root in roots())
+
 def discover(limit=100,max_depth=4):
     found=[]
     for root in roots():
@@ -20,14 +31,27 @@ def discover(limit=100,max_depth=4):
             for c in children:
                 if c.is_dir() and c.name not in IGNORE and not sensitive(c):q.append((c,d+1))
     return {'success':True,'projects':found,'count':len(found)}
+
 def read_file(path):
     p=Path(path).expanduser().resolve()
     if sensitive(p):return {'success':False,'error':'Sensitive file blocked'}
+    if not _inside_workspace(p):return {'success':False,'error':'Path is outside configured workspace'}
     if not p.is_file():return {'success':False,'error':'File not found'}
     try:return {'success':True,'path':str(p),'content':__import__('tools.safety',fromlist=['redact']).redact(p.read_text(encoding='utf-8',errors='replace'))}
     except Exception as e:return {'success':False,'error':str(e)}
+
+def read_files(paths):
+    if not isinstance(paths,list) or not paths:return {'success':False,'error':'At least one path is required'}
+    if len(paths)>12:return {'success':False,'error':'At most 12 files per batch'}
+    results=[]
+    for path in paths:
+        results.append(read_file(path))
+    return {'success':all(x.get('success') for x in results),'files':results}
+
 def structure(path):
-    p=Path(path).expanduser().resolve(); important=[]; count=0
+    p=Path(path).expanduser().resolve()
+    if not _inside_workspace(p):return {'success':False,'error':'Project is outside configured workspace'}
+    important=[]; count=0
     for x in p.rglob('*'):
         if any(part in IGNORE for part in x.relative_to(p).parts):continue
         if x.is_file():
