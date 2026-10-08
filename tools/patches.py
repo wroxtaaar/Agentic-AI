@@ -1,7 +1,7 @@
 import hashlib,json,os,secrets
 from pathlib import Path
 from .safety import sensitive,within
-from core.approvals import create,get,set_status
+from core.approvals import create,get
 ROOT=Path(__file__).resolve().parent.parent
 PROPOSALS=Path(os.getenv('AGENT_PROPOSALS_DIR','/data/proposals'))
 PROPOSALS.mkdir(parents=True,exist_ok=True)
@@ -71,5 +71,24 @@ def apply(pid):
             except Exception: pass
         return {'success':False,'error':f'Patch application failed and rollback was attempted: {exc}'}
     p['status']='applied'; p['backups']=backups; save(p)
-    set_status(approval['id'],'executed')
     return {'success':True,'proposal_id':pid,'approval_id':approval['id'],'backups':backups,'verification_required':True}
+
+def rollback(pid):
+    p=load(pid)
+    if not p or p.get('status')!='applied': return {'success':False,'error':'Proposal is not applied'}
+    backups=p.get('backups') or []
+    if len(backups)!=len(p.get('edits') or []):
+        return {'success':False,'error':'Backup set is incomplete; refusing rollback'}
+    restored=[]
+    try:
+        for e,backup in zip(p['edits'],backups):
+            target=(Path(p['project'])/e['file']).resolve()
+            backup_path=Path(backup).resolve()
+            if not backup_path.is_file() or not within(backup_path,Path(p['project']).resolve()):
+                return {'success':False,'error':f'Invalid backup path: {backup}'}
+            target.write_text(backup_path.read_text(encoding='utf-8'),encoding='utf-8')
+            restored.append(e['file'])
+    except Exception as exc:
+        return {'success':False,'error':f'Rollback failed: {exc}','restored':restored}
+    p['status']='rolled_back'; save(p)
+    return {'success':True,'proposal_id':pid,'restored':restored}
