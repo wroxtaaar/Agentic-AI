@@ -3,8 +3,9 @@ import time
 from core.approvals import get, set_status
 from tools.docker import execute_action, verify_container
 from tools.memory import save_approved
-from tools.patches import apply as apply_patch
+from tools.patches import apply as apply_patch, rollback as rollback_patch
 from tools.git_actions import execute_commit
+from tools.verify import project_verify
 
 DOCKER_KINDS = {"docker_restart", "docker_start", "docker_stop"}
 
@@ -29,10 +30,8 @@ def execute_approved(aid):
         verification = {"success": False}
         for attempt in range(5):
             verification = verify_container(container, expected_status=expected_status)
-            if verification.get("success"):
-                break
-            if attempt < 4:
-                time.sleep(2)
+            if verification.get("success"): break
+            if attempt < 4: time.sleep(2)
         if not verification.get("success"):
             set_status(aid, "failed")
             return {"success": False, "approval_id": aid, "kind": kind, "result": result,
@@ -64,13 +63,22 @@ def execute_approved(aid):
         if not proposal_id:
             set_status(aid, "failed")
             return {"success": False, "approval_id": aid, "error": "Missing proposal_id"}
-        result = apply_patch(proposal_id)
-        if not result.get("success"):
+        proposal_result = apply_patch(proposal_id)
+        if not proposal_result.get("success"):
             set_status(aid, "failed")
-            return {"success": False, "approval_id": aid, "kind": kind, "result": result}
+            return {"success": False, "approval_id": aid, "kind": kind, "result": proposal_result}
+        verification = project_verify(proposal_result.get("project", proposal_result.get("path", "")) or
+                                      __import__("tools.patches", fromlist=["load"]).load(proposal_id)["project"],
+                                      mode="auto", timeout=180)
+        if not verification.get("success"):
+            rollback = rollback_patch(proposal_id)
+            set_status(aid, "failed")
+            return {"success": False, "approval_id": aid, "kind": kind,
+                    "result": proposal_result, "verification": verification,
+                    "rollback": rollback, "error": "Patch applied but verification failed; rollback attempted"}
         set_status(aid, "executed")
-        return {"success": True, "approval_id": aid, "kind": kind, "result": result,
-                "verification": {"success": True, "verified": True, "note": "Patch applied; run the project's tests before deployment"}}
+        return {"success": True, "approval_id": aid, "kind": kind, "result": proposal_result,
+                "verification": verification}
 
     return {"success": False, "approval_id": aid, "kind": kind,
             "error": f"No executor is registered for approval kind '{kind}'"}
