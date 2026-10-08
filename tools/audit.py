@@ -1,4 +1,4 @@
-import os
+import json
 import subprocess
 from pathlib import Path
 
@@ -28,12 +28,31 @@ def _git(root: Path, args):
             "stderr": redact(r.stderr, 5000),
             "return_code": r.returncode,
         }
+    except FileNotFoundError:
+        return {
+            "success": False,
+            "error_type": "git_unavailable",
+            "error": "Git executable is not available in the agent runtime",
+        }
     except Exception as exc:
-        return {"success": False, "error": str(exc)}
+        return {"success": False, "error_type": "git_execution_error", "error": str(exc)}
 
 
 def _has(root: Path, *names):
     return [name for name in names if (root / name).exists()]
+
+
+def _finding(kind, severity, confidence, title, evidence, detail=None):
+    item = {
+        "kind": kind,
+        "severity": severity,
+        "confidence": confidence,
+        "title": title,
+        "evidence": evidence,
+    }
+    if detail:
+        item["detail"] = detail
+    return item
 
 
 def audit_project(path):
@@ -59,6 +78,7 @@ def audit_project(path):
         "name": root.name,
         "types": detected,
         "markers": markers,
+        "findings": [],
     }
 
     git_dir = root / ".git"
@@ -66,14 +86,40 @@ def audit_project(path):
         status = _git(root, ["status", "--short", "--branch"])
         branch = _git(root, ["branch", "--show-current"])
         commits = _git(root, ["log", "-5", "--oneline", "--decorate"])
+        git_ok = status.get("success") and branch.get("success") and commits.get("success")
+        dirty = None
+        if status.get("success"):
+            lines = status.get("stdout", "").splitlines()
+            dirty = bool(lines[1:])
+
         result["git"] = {
+            "success": git_ok,
             "status": status,
             "branch": branch,
             "recent_commits": commits,
-            "dirty": bool(status.get("stdout", "").splitlines()[1:]),
+            "dirty": dirty,
         }
+
+        if not git_ok:
+            result["findings"].append(_finding(
+                "availability", "info", "verified",
+                "Git state could not be fully verified",
+                {"status": status, "branch": branch, "recent_commits": commits},
+                "The audit will not infer that Git is missing unless the executable check explicitly reports that.",
+            ))
+        elif dirty:
+            result["findings"].append(_finding(
+                "repository", "info", "verified",
+                "Working tree has changes",
+                {"git_status": status.get("stdout", "")},
+            ))
     else:
         result["git"] = {"success": False, "error": "Not a Git repository"}
+        result["findings"].append(_finding(
+            "repository", "info", "verified",
+            "Project is not a Git repository",
+            {"path": str(root / ".git")},
+        ))
 
     try:
         files = []
@@ -97,7 +143,6 @@ def audit_project(path):
 
     if (root / "package.json").is_file():
         try:
-            import json
             package = json.loads((root / "package.json").read_text(encoding="utf-8"))
             scripts = package.get("scripts", {})
             result["node"] = {
@@ -112,7 +157,14 @@ def audit_project(path):
     if (root / "pom.xml").exists():
         result["maven"] = {"wrapper": (root / "mvnw").exists()}
 
-    if (root / "build.gradle").exists() or (root / "build.gradle.kts").exists():
+    if (root / "build.gradle").exists() or (root / "build.gradle.kts").exists() or (root / "gradlew").exists():
         result["gradle"] = {"wrapper": (root / "gradlew").exists()}
+        if not (root / "gradlew").exists():
+            result["findings"].append(_finding(
+                "build", "low", "verified",
+                "Gradle wrapper is missing",
+                {"expected": "gradlew", "project": str(root)},
+                "A system Gradle installation may be required for builds.",
+            ))
 
     return result
