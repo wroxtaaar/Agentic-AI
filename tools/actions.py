@@ -3,7 +3,7 @@ import time
 from core.approvals import get, set_status
 from tools.docker import execute_action, verify_container
 from tools.memory import save_approved
-from tools.patches import apply as apply_patch, rollback as rollback_patch
+from tools.patches import apply as apply_patch, rollback as rollback_patch, load as load_patch
 from tools.git_actions import execute_commit
 from tools.verify import project_verify
 
@@ -67,9 +67,9 @@ def execute_approved(aid):
         if not proposal_result.get("success"):
             set_status(aid, "failed")
             return {"success": False, "approval_id": aid, "kind": kind, "result": proposal_result}
-        verification = project_verify(proposal_result.get("project", proposal_result.get("path", "")) or
-                                      __import__("tools.patches", fromlist=["load"]).load(proposal_id)["project"],
-                                      mode="auto", timeout=180)
+        proposal = load_patch(proposal_id)
+        project_path = proposal.get("project") if proposal else ""
+        verification = project_verify(project_path, mode="auto", timeout=180)
         if not verification.get("success"):
             rollback = rollback_patch(proposal_id)
             set_status(aid, "failed")
