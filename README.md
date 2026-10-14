@@ -69,3 +69,12 @@ Use Tailscale or another private network for access. Do not expose the raw contr
 - Check Docker containers and find anything using too much memory.
 
 The agent investigates first, presents evidence, and requires approval before mutations. Docker start/restart/stop, Git commits, durable memory writes, and exact source patches are approval-gated. Approved Docker actions are verified after execution. The control plane is intended to remain private behind Tailscale or another trusted network.
+
+
+## Continuous VPS monitoring (optional)
+
+The monitoring branch adds a separate read-only worker for Docker container status/health, per-container CPU and memory thresholds, bounded recent error-log excerpts, HTTP health checks, incident deduplication, and email alerts on incident/recovery transitions.
+
+See [monitoring/README.md](monitoring/README.md) for the security model and setup. Before enabling the monitor, create a private `.env.monitor` on the VPS from `.env.monitor.example`; SMTP credentials must never be committed. The monitor uses a private Docker socket proxy configured for GET-only API requests and does not perform restarts or deployments.
+
+The current implementation checks container-level resource use, not host root-disk free space or total host memory. The ChatGPT read-only diagnostic connector is a planned follow-up and is not included in the monitoring worker.
