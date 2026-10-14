@@ -31,9 +31,8 @@ services:
     command: ["python", "tools/diagnostics_mcp.py"]
     container_name: agentic-diagnostics-mcp
     restart: unless-stopped
-    env_file:
-      - .env
     environment:
+      AGENT_API_TOKEN: "${AGENT_API_TOKEN:?AGENT_API_TOKEN must be set in .env}"
       DIAGNOSTICS_AGENT_URL: http://agent:8787
       DIAGNOSTICS_MCP_PORT: "8788"
       DIAGNOSTICS_MCP_CONTAINERS: home,docker-control-bot,agentic-ai,agentic-monitor
