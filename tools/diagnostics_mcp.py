@@ -23,6 +23,15 @@ ALLOWED_CONTAINERS = frozenset(
 mcp = FastMCP("Oracle VPS Read-only Diagnostics")
 mcp.settings.host = "0.0.0.0"
 mcp.settings.port = int(os.getenv("DIAGNOSTICS_MCP_PORT", "8788"))
+# Secure MCP Tunnel forwards using this internal service host header. Keep this
+# allowlist explicit; do not disable Host-header validation globally.
+mcp.settings.transport_security.allowed_hosts = [
+    "diagnostics-mcp:8788",
+    "localhost",
+    "localhost:8788",
+    "127.0.0.1",
+    "127.0.0.1:8788",
+]
 READ_ONLY = ToolAnnotations(
     readOnlyHint=True,
     destructiveHint=False,
