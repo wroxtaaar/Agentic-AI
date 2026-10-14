@@ -77,4 +77,4 @@ The monitoring branch adds a separate read-only worker for Docker container stat
 
 See [monitoring/README.md](monitoring/README.md) for the security model and setup. Before enabling the monitor, create a private `.env.monitor` on the VPS from `.env.monitor.example`; SMTP credentials must never be committed. The monitor uses a private Docker socket proxy configured for GET-only API requests and does not perform restarts or deployments.
 
-The current implementation checks container-level resource use, not host root-disk free space or total host memory. The ChatGPT read-only diagnostic connector is a planned follow-up and is not included in the monitoring worker.
+The monitor checks container-level resource use, not host root-disk free space or total host memory. The private agent API also provides authenticated read-only diagnostics endpoints for allowlisted container status, CPU/memory snapshots, and bounded redacted logs. See [monitoring/DIAGNOSTICS_API.md](monitoring/DIAGNOSTICS_API.md). This is not a native ChatGPT connector: use a private SSH tunnel to retrieve diagnostics and share the resulting JSON for analysis. Do not expose the control API publicly.
