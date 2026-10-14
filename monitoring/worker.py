@@ -218,8 +218,12 @@ def process_issues(issues: dict[str, tuple[str, str]]) -> None:
                 print(f"NEW INCIDENT: {subject}: {details}")
             else:
                 con.execute(
-                    "UPDATE incidents SET subject=?,details=?,last_seen=?,status='active',missed_checks=0 WHERE fingerprint=?",
-                    (subject, details, timestamp, fp),
+                    """UPDATE incidents
+                       SET subject=?, details=?, last_seen=?, status='active', missed_checks=0,
+                           first_seen=CASE WHEN status='recovered' THEN ? ELSE first_seen END,
+                           notified=CASE WHEN status='recovered' THEN 0 ELSE notified END
+                       WHERE fingerprint=?""",
+                    (subject, details, timestamp, timestamp, fp),
                 )
 
             row = con.execute(
