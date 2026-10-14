@@ -21,13 +21,13 @@ CONTAINERS = {
 MAX_LOG_LINES = max(20, min(200, int(os.getenv("DIAGNOSTICS_MAX_LOG_LINES", "100"))))
 MAX_LOG_CHARS = 12000
 _INLINE_SECRET = re.compile(
-    r"(?i)((?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret|client_secret|private[_-]?key)\\s*[=:]\\s*)['\\\"]?[^\\s,'\\\";]+"
+    r"(?i)((?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret|client_secret|private[_-]?key)\s*[=:]\s*)['\\"]?[^\s,'\\";]+"
 )
 _CONTAINER_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$")
 
 
 def _redact(value: str, limit: int = MAX_LOG_CHARS) -> str:
-    value = _INLINE_SECRET.sub(r"\\1[REDACTED]", value)
+    value = _INLINE_SECRET.sub(r"\1[REDACTED]", value)
     return redact(value, limit)
 
 
