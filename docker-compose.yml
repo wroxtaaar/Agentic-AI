@@ -9,6 +9,7 @@ services:
       - .env
     environment:
       AGENT_WORKSPACE_ROOTS: /home/ubuntu
+      DIAGNOSTICS_MAX_LOG_LINES: "200"
     ports:
       - "127.0.0.1:8787:8787"
     volumes:
