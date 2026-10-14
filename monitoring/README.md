@@ -51,6 +51,6 @@ Expected: agentic-monitor stays running and prints periodic check summaries. If 
 
 To test email delivery safely, use a temporary, intentionally invalid health URL in MONITOR_HEALTH_URLS, deploy/recreate the monitor, confirm an alert arrives, then restore the real URL. Do not stop production containers merely to test notifications.
 
-## ChatGPT diagnosis integration: next phase
+## Read-only diagnostics API
 
-This branch adds monitoring and email only. It does not expose a new public API or automatically forward logs to ChatGPT. The follow-up integration should be a narrowly scoped, authenticated read-only endpoint (or MCP server) that returns bounded, redacted incident summaries and selected log excerpts. Keep the existing full-control agent API private; never expose the Docker socket proxy or the control API to the public internet.
+The private agent API now exposes bounded, authenticated diagnostics endpoints for allowlisted container status, resource snapshots, and redacted recent logs. See [DIAGNOSTICS_API.md](DIAGNOSTICS_API.md) for routes and SSH-tunnel usage. This is not a native ChatGPT connector; the API must remain private, and outputs can be pasted into ChatGPT for diagnosis. Never expose the control API or Docker socket proxy to the public internet.
