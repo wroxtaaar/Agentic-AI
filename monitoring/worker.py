@@ -117,6 +117,8 @@ def send_email(subject: str, body: str) -> bool:
 
 def fingerprint(subject: str, details: str) -> str:
     normalized = NOISY_VALUES.sub("[ID]", details.lower())
+    normalized = re.sub(r"\b\d{4}-\d{2}-\d{2}[t ][0-9:.+z-]+\b", "[TIME]", normalized)
+    normalized = re.sub(r"\b\d{2}:\d{2}:\d{2}(?:\.\d+)?\b", "[TIME]", normalized)
     normalized = re.sub(r"\s+", " ", normalized).strip()[:800]
     return hashlib.sha256(f"{subject}|{normalized}".encode()).hexdigest()[:24]
 
@@ -158,6 +160,28 @@ def collect_issues() -> dict[str, tuple[str, str]]:
                     f"Container unhealthy: {name}",
                     f"Container={name}; status={status}; health={health}; restart_count={restarts}",
                 )
+
+        stats_ok, stats = run_docker(["stats", "--no-stream", "--format", "{{.CPUPerc}}|{{.MemUsage}}|{{.MemPerc}}", name], timeout=15)
+        if stats_ok and stats:
+            values = stats.split("|")
+            if len(values) == 3:
+                try:
+                    cpu_pct = float(values[0].strip().rstrip("%"))
+                    mem_pct = float(values[2].strip().rstrip("%"))
+                    cpu_limit = float(os.getenv("MONITOR_CPU_ALERT_PERCENT", "95"))
+                    mem_limit = float(os.getenv("MONITOR_MEMORY_ALERT_PERCENT", "90"))
+                    if cpu_pct >= cpu_limit:
+                        issues[f"cpu:{name}"] = (
+                            f"High CPU usage: {name}",
+                            f"Container={name}; cpu_percent={cpu_pct:.1f}; threshold={cpu_limit:.1f}; memory={values[1]}",
+                        )
+                    if mem_pct >= mem_limit:
+                        issues[f"memory:{name}"] = (
+                            f"High memory usage: {name}",
+                            f"Container={name}; memory_percent={mem_pct:.1f}; threshold={mem_limit:.1f}; memory={values[1]}",
+                        )
+                except ValueError:
+                    pass
 
         log_ok, logs = run_docker(["logs", "--since", LOG_SINCE, "--tail", str(LOG_TAIL), name], timeout=20)
         if log_ok and logs:
