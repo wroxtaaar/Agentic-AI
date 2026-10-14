@@ -22,5 +22,53 @@ services:
       retries: 5
       start_period: 10s
 
+  # This proxy only allows Docker API GET requests. The monitor does not receive
+  # the unrestricted Docker socket mounted by the agent service.
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:0.3.0
+    restart: unless-stopped
+    environment:
+      CONTAINERS: "1"
+      INFO: "1"
+      PING: "1"
+      VERSION: "1"
+      DISK_USAGE: "1"
+      POST: "0"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - monitor-backend
+
+  monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agentic-monitor
+    command: ["python", "-m", "monitoring.worker"]
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
+      MONITOR_DB_PATH: /data/monitor.db
+      MONITOR_INTERVAL_SECONDS: ${MONITOR_INTERVAL_SECONDS:-300}
+      MONITOR_CONTAINERS: ${MONITOR_CONTAINERS:-home,docker-control-bot,agentic-ai}
+      MONITOR_HEALTH_URLS: ${MONITOR_HEALTH_URLS:-http://host.docker.internal:10000/health}
+      MONITOR_LOG_SINCE: ${MONITOR_LOG_SINCE:-10m}
+      MONITOR_LOG_TAIL: ${MONITOR_LOG_TAIL:-120}
+      MONITOR_RECOVERY_MISSES: ${MONITOR_RECOVERY_MISSES:-2}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - monitor-data:/data
+    depends_on:
+      - docker-socket-proxy
+    networks:
+      - monitor-backend
+
+networks:
+  monitor-backend:
+
 volumes:
   agentic-data:
+  monitor-data:
