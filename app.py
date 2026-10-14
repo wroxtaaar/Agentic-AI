@@ -11,6 +11,9 @@ from tools.system import info
 from tools.projects import discover
 from tools.docker import list_containers
 from tools.actions import execute_approved
+from tools.diagnostics import (
+    container_diagnostics, container_logs, list_diagnostics_containers,
+)
 
 load_dotenv()
 app=FastAPI(title='Oracle VPS Agent',version='1.0.0')
@@ -102,6 +105,40 @@ def execute_approved_action(aid:str,authorization:str|None=Header(default=None))
 @app.post('/api/actions/docker/{aid}/execute')
 def execute_docker_action(aid:str,authorization:str|None=Header(default=None)):
     return execute_approved_action(aid,authorization)
+
+@app.get('/api/diagnostics/containers')
+def diagnostics_containers(authorization:str|None=Header(default=None)):
+    """Bounded read-only status for the configured container allowlist."""
+    auth(authorization)
+    return list_diagnostics_containers()
+
+@app.get('/api/diagnostics/containers/{name}')
+def diagnostics_container(name:str,authorization:str|None=Header(default=None)):
+    """Read-only resource/status details for one allowlisted container."""
+    auth(authorization)
+    try:
+        result=container_diagnostics(name)
+    except ValueError as exc:
+        raise HTTPException(404,str(exc))
+    if not result.get('available'):
+        raise HTTPException(502,result)
+    return result
+
+@app.get('/api/diagnostics/containers/{name}/logs')
+def diagnostics_container_logs(
+    name:str,
+    lines:int=100,
+    authorization:str|None=Header(default=None),
+):
+    """Fetch bounded, redacted recent logs from an allowlisted container."""
+    auth(authorization)
+    try:
+        result=container_logs(name,lines)
+    except (ValueError,TypeError) as exc:
+        raise HTTPException(404,str(exc))
+    if not result.get('success'):
+        raise HTTPException(502,result)
+    return result
 
 @app.get('/',include_in_schema=False)
 def index(): return FileResponse(Path(__file__).parent/'web'/'index.html')
