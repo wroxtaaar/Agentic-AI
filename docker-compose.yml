@@ -22,6 +22,30 @@ services:
       retries: 5
       start_period: 10s
 
+  # Private MCP endpoint for Secure MCP Tunnel. No published host port,
+  # no Docker socket, and only fixed read-only diagnostics tools.
+  diagnostics-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "tools/diagnostics_mcp.py"]
+    container_name: agentic-diagnostics-mcp
+    restart: unless-stopped
+    environment:
+      AGENT_API_TOKEN: "${AGENT_API_TOKEN:?AGENT_API_TOKEN must be set in .env}"
+      DIAGNOSTICS_AGENT_URL: http://agent:8787
+      DIAGNOSTICS_MCP_PORT: "8788"
+      DIAGNOSTICS_MCP_CONTAINERS: home,docker-control-bot,agentic-ai,agentic-monitor
+    depends_on:
+      agent:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0 if b'tools/diagnostics_mcp.py' in open('/proc/1/cmdline','rb').read() else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
   # This proxy only allows Docker API GET requests. The monitor does not receive
   # the unrestricted Docker socket mounted by the agent service.
   docker-socket-proxy:
