@@ -47,7 +47,7 @@ services:
     command: ["python", "-m", "monitoring.worker"]
     restart: unless-stopped
     env_file:
-      - .env
+      - .env.monitor
     environment:
       DOCKER_HOST: tcp://docker-socket-proxy:2375
       MONITOR_DB_PATH: /data/monitor.db
