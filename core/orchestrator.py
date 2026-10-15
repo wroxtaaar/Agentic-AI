@@ -106,8 +106,48 @@ class Orchestrator:
         except Exception as exc:
             return "Architect review unavailable; worker report is shown without independent review.", str(exc)
 
+    def _direct_read_only_git(self, user):
+        """Run explicit, read-only Git inspection requests without spending inference quota."""
+        low = user.lower()
+        forbidden = ("modify", "edit ", "change ", "commit", "push ", "write ", "delete ", "reset ", "checkout ")
+        if any(term in low for term in forbidden):
+            return None
+        inspection_words = ("inspect", "show", "report", "check", "status", "branch", "log", "history", "untracked", "read-only", "read only")
+        if not any(term in low for term in inspection_words):
+            return None
+
+        requested = []
+        if "git_status" in low or "git status" in low or "untracked" in low or "working tree" in low:
+            requested.append("git_status")
+        if "git_branch" in low or "git branch" in low or "current branch" in low:
+            requested.append("git_branch")
+        if "git_log" in low or "git log" in low or "recent commits" in low or "commit history" in low:
+            requested.append("git_log")
+        if not requested:
+            return None
+
+        trace = []
+        outputs = []
+        for name in dict.fromkeys(requested):
+            tool = self.tools[name]
+            try:
+                result = tool["function"]()
+            except Exception as exc:
+                result = {"success": False, "error": str(exc)}
+            trace_item = {"tool": name, "success": bool(result.get("success")), "result": result}
+            trace.append(trace_item)
+            outputs.append(f"{name}: {json.dumps(result, sort_keys=True)}")
+        success = all(item["success"] for item in trace)
+        answer = "Read-only Git inspection results (raw tool outputs):\n" + "\n".join(outputs)
+        return {
+            "success": success, "answer": answer, "specialists": ["git"],
+            "trace": trace, "architect_plan": "Direct read-only Git dispatch; no inference calls used.",
+            "planning_error": None, "review_error": "Skipped for deterministic read-only Git inspection.",
+            "worker_model": None, "architect_model": None,
+        }
+
     def run(self, user, history=None):
-        specialists = self.specialists(user)
+        direct_result = self._direct_read_only_git(user)\n        if direct_result is not None:\n            return direct_result\n        specialists = self.specialists(user)
         missions = "; ".join(
             f"{s.name}: {s.mission}" for s in SPECIALISTS if s.name in specialists
         )
