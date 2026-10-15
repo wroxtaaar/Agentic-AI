@@ -57,7 +57,7 @@ class Orchestrator:
     def _valid_tool_calls(raw_calls):
         """Keep only structurally valid tool calls; malformed provider data is not executable."""
         if not isinstance(raw_calls, list):
-            return [], 1 if raw_calls else 0
+            return [], 1 if raw_calls is not None else 0
         valid = []
         invalid = 0
         for call in raw_calls:
