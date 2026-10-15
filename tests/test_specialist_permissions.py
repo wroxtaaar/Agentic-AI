@@ -1,6 +1,6 @@
 import unittest
 
-from core.orchestrator import Orchestrator
+from core.orchestrator import Orchestrator, SPECIALIST_READONLY_TOOL_NAMES
 
 
 class SpecialistToolPermissionTests(unittest.TestCase):
@@ -8,8 +8,9 @@ class SpecialistToolPermissionTests(unittest.TestCase):
         self.tools = {
             "read_file": {"function": lambda **kwargs: {"success": True}},
             "coding_write_file": {"function": lambda **kwargs: {"success": True}},
+            "git_commit": {"function": lambda **kwargs: {"success": True}},
         }
-        self.readonly_names = {"read_file", "git_status", "verify_project"}
+        self.readonly_names = SPECIALIST_READONLY_TOOL_NAMES
 
     def test_explicit_read_only_role_tool_is_allowed(self):
         self.assertTrue(
@@ -23,6 +24,16 @@ class SpecialistToolPermissionTests(unittest.TestCase):
             Orchestrator._specialist_tool_is_allowed(
                 "coding_write_file",
                 {"coding_write_file"},
+                self.readonly_names,
+                self.tools,
+            )
+        )
+
+    def test_proposal_or_mutation_tool_is_denied_even_if_added_to_role_allowlist(self):
+        self.assertFalse(
+            Orchestrator._specialist_tool_is_allowed(
+                "git_commit",
+                {"git_commit"},
                 self.readonly_names,
                 self.tools,
             )
