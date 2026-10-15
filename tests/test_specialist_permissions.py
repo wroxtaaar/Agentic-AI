@@ -12,6 +12,13 @@ class SpecialistToolPermissionTests(unittest.TestCase):
         }
         self.readonly_names = SPECIALIST_READONLY_TOOL_NAMES
 
+    def test_empty_worker_response_is_not_usable(self):
+        self.assertFalse(Orchestrator._worker_response_is_usable(""))
+        self.assertFalse(Orchestrator._worker_response_is_usable("  \n"))
+
+    def test_nonempty_worker_response_is_usable(self):
+        self.assertTrue(Orchestrator._worker_response_is_usable("Task report"))
+
     def test_empty_specialist_report_is_unavailable(self):
         report = Orchestrator._build_specialist_report("security", "  ", [], 0)
         self.assertFalse(report["success"])
