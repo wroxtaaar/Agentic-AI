@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from core.orchestrator import Orchestrator, SPECIALIST_READONLY_TOOL_NAMES
 
@@ -11,6 +12,21 @@ class SpecialistToolPermissionTests(unittest.TestCase):
             "git_commit": {"function": lambda **kwargs: {"success": True}},
         }
         self.readonly_names = SPECIALIST_READONLY_TOOL_NAMES
+
+    def test_run_marks_empty_worker_response_as_unverified(self):
+        agent = Orchestrator()
+        with patch.object(agent, "_direct_read_only_git", return_value=None), \
+             patch.object(agent, "specialists", return_value=["project"]), \
+             patch.object(agent, "_architect_plan", return_value=("plan", None)), \
+             patch.object(agent, "_specialist_investigations", return_value=[]), \
+             patch.object(agent, "_request", return_value={"content": "  "} ), \
+             patch.object(agent, "_architect_review") as review:
+            result = agent.run("Investigate the project")
+
+        self.assertFalse(result["success"])
+        self.assertIn("completion is unverified", result["answer"])
+        self.assertIn("Skipped", result["architect_review"])
+        review.assert_not_called()
 
     def test_empty_worker_response_is_not_usable(self):
         self.assertFalse(Orchestrator._worker_response_is_usable(""))
