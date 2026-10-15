@@ -54,6 +54,11 @@ class Orchestrator:
         return name in allowed_names and name in readonly_names and name in tools
 
     @staticmethod
+    def _worker_response_is_usable(report_text):
+        """A blank assistant response is not evidence of task completion."""
+        return bool((report_text or "").strip())
+
+    @staticmethod
     def _build_specialist_report(name, report_text, trace, calls_used):
         """Represent empty specialist output as unavailable, never as a successful review."""
         report_text = (report_text or "").strip()
@@ -322,6 +327,21 @@ class Orchestrator:
             )
             if not calls:
                 worker_answer = msg.get("content") or ""
+                if not self._worker_response_is_usable(worker_answer):
+                    return {
+                        "success": False,
+                        "answer": "Worker returned an empty response; task completion is unverified. Retry or inspect the model/provider response.",
+                        "architect_plan": plan,
+                        "specialist_reports": specialist_reports,
+                        "architect_review": "Skipped because the worker produced no report to review.",
+                        "architect_model": self.architect_model,
+                        "worker_model": self.worker_model,
+                        "specialist_model": self.specialist_model,
+                        "planning_error": planning_error,
+                        "review_error": "Skipped because the worker produced no report to review.",
+                        "specialists": specialists,
+                        "trace": trace,
+                    }
                 review, review_error = self._architect_review(user, plan, worker_answer, specialist_reports)
                 return {
                     "success": True, "answer": worker_answer, "architect_plan": plan,
