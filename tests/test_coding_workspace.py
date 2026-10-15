@@ -28,6 +28,31 @@ class CodingWorkspaceSafetyTests(unittest.TestCase):
         self.assertFalse(result["success"])
         self.assertIn("blocked", result["error"])
 
+    def test_write_rejects_path_traversal(self):
+        item = {"id": "a" * 16, "project": "/tmp/project", "worktree": "/tmp/project-worktree", "status": "editing"}
+        with patch.object(cw, "_load", return_value=item):
+            result = cw.write_workspace_file("a" * 16, "../outside.txt", "not allowed")
+        self.assertFalse(result["success"])
+        self.assertIn("Invalid relative path", result["error"])
+
+    def test_write_rejects_generated_directories(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            item = {"id": "a" * 16, "project": str(root), "worktree": str(root), "status": "editing"}
+            with patch.object(cw, "_load", return_value=item):
+                result = cw.write_workspace_file("a" * 16, "node_modules/payload.js", "unsafe")
+        self.assertFalse(result["success"])
+        self.assertIn("blocked", result["error"])
+
+    def test_write_refuses_non_editable_workspace(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            item = {"id": "a" * 16, "project": str(root), "worktree": str(root), "status": "pending_approval"}
+            with patch.object(cw, "_load", return_value=item):
+                result = cw.write_workspace_file("a" * 16, "app.py", "print('no')")
+        self.assertFalse(result["success"])
+        self.assertIn("no longer editable", result["error"])
+
 
 if __name__ == "__main__":
     unittest.main()
