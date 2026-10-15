@@ -34,7 +34,7 @@ def build_tools():
       t('docker_stop','PROPOSAL ONLY: request approval to stop a Docker container. Does not stop it.',propose_stop,{'container':{'type':'string'}},['container']),
       t('git_status','Show the configured/default repository status; pass path only when inspecting a different repository.',status,git_path),
       t('git_branch','Show the configured/default repository branch; pass path only when inspecting a different repository.',branch,git_path),
-      t('git_log','Show recent commits in the configured/default repository; pass path only when inspecting a different repository.',log,{...git_path,count:{type:'integer'} }),
+      t('git_log','Show recent commits in the configured/default repository; pass path only when inspecting a different repository.',log,{**git_path, 'count': {'type':'integer'}}),
       t('git_diff','Show unstaged diff statistics for the configured/default repository; pass path only when inspecting a different repository.',diff,git_path),
       t('git_commit','PROPOSAL ONLY: request approval to create a local Git commit. Does not commit.',propose_commit,{'path':{'type':'string'},'message':{'type':'string'}},['path','message']),
       t('memory_save','PROPOSAL ONLY: request approval to save durable non-secret project memory.',memory_save,{'content':{'type':'string'},'project':{'type':'string'}},['content']),
