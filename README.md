@@ -70,7 +70,7 @@ Use Tailscale or another private network for access. Do not expose the raw contr
 - Fix the crash in FinanceSMSTracker and prepare a patch.
 - Check Docker containers and find anything using too much memory.
 
-The agent investigates first, presents evidence, and requires approval before mutations. Docker start/restart/stop, Git commits, durable memory writes, and exact source patches are approval-gated. Approved Docker actions are verified after execution. The control plane is intended to remain private behind Tailscale or another trusted network.
+The agent investigates first, presents evidence, and requires approval before mutations. For coding tasks, it can create a detached worktree under `AGENT_CODING_WORKSPACE_ROOT`, edit and test there, and retry failed checks for up to three edit/verify cycles. It refuses to start if the source checkout has uncommitted changes. After successful verification, `coding_finalize` produces a diff and a pending `workspace_patch` approval. Approving and executing that item applies the patch to the original checkout and reruns verification; a failed post-apply check triggers a reverse-patch rollback attempt. This does not commit or push. Review the resulting Git diff, then request a separate approval-gated commit; the existing GitHub Actions workflow deploys after a push to `main`. Docker start/restart/stop, Git commits, durable memory writes, and exact source patches are approval-gated. Approved Docker actions are verified after execution. The control plane is intended to remain private behind Tailscale or another trusted network.
 
 ## Continuous VPS monitoring (optional)
 
