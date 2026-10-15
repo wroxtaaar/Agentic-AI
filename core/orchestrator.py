@@ -184,9 +184,13 @@ class Orchestrator:
                         if calls else {"role": "assistant", "content": message.get("content") or ""}
                     )
                     if not calls:
+                        report_text = (message.get("content") or "").strip()
                         reports.append({
-                            "agent": name, "success": True,
-                            "report": message.get("content") or "Specialist returned an empty report.",
+                            "agent": name, "success": bool(report_text),
+                            "report": report_text or (
+                                "Specialist returned no findings after its investigation; "
+                                "treat this review as unavailable, not as a successful assessment."
+                            ),
                             "tool_trace": trace, "tool_calls": calls_used,
                         })
                         break
