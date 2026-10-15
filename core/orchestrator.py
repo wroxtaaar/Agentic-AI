@@ -409,7 +409,7 @@ class Orchestrator:
                 }
             for call in calls:
                 name = call.get("function", {}).get("name", "")
-                raw_args = call.get("function", {}).get("arguments") or "{}"
+                raw_args = call.get("function", {}).get("arguments")
                 args, args_error = self._parse_tool_arguments(raw_args)
                 if args_error:
                     trace.append({"tool": name, "success": False, "error": args_error})
