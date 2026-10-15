@@ -41,6 +41,16 @@ class ModelRoutingTests(unittest.TestCase):
         self.assertEqual(agent.architect_model, "auto")
         self.assertEqual(agent.worker_model, "auto")
 
+    def test_missing_freellmapi_key_has_gateway_specific_error(self):
+        env = {
+            "AI_BASE_URL": "http://freellmapi:3001/v1/chat/completions",
+            "AI_API_KEY": "", "OPENROUTER_API_KEY": "must-not-be-used",
+        }
+        with patch.dict(os.environ, env, clear=False):
+            agent = Orchestrator()
+        with self.assertRaisesRegex(RuntimeError, "AI_API_KEY is not configured for the FreeLLMAPI gateway"):
+            agent._request("auto", [{"role": "user", "content": "hello"}])
+
     def test_freellmapi_uses_only_its_gateway_key(self):
         env = {
             "AI_BASE_URL": "http://freellmapi:3001/v1/chat/completions",
