@@ -93,6 +93,23 @@ class ModelRoutingTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "AI gateway returned no assistant message"):
                 agent._request("auto", [{"role": "user", "content": "hello"}])
 
+    def test_tool_arguments_reject_invalid_json(self):
+        args, error = Orchestrator._parse_tool_arguments("{not-json")
+        self.assertIsNone(args)
+        self.assertIn("invalid JSON", error)
+
+    def test_tool_arguments_require_json_object(self):
+        for raw in ("", "[]", '"string"', "null"):
+            with self.subTest(raw=raw):
+                args, error = Orchestrator._parse_tool_arguments(raw)
+                self.assertIsNone(args)
+                self.assertIsNotNone(error)
+
+    def test_tool_arguments_accept_json_object(self):
+        args, error = Orchestrator._parse_tool_arguments('{"path": "/tmp/project"}')
+        self.assertEqual(args, {"path": "/tmp/project"})
+        self.assertIsNone(error)
+
     def test_freellmapi_uses_only_its_gateway_key(self):
         env = {
             "AI_BASE_URL": "http://freellmapi:3001/v1/chat/completions",
