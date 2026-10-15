@@ -50,6 +50,31 @@ class ModelRoutingTests(unittest.TestCase):
             agent = Orchestrator()
         self.assertEqual(agent.api_key, "freellmapi-key")
 
+    def test_specialist_model_can_use_separate_chain(self):
+        env = {
+            "AI_BASE_URL": "http://freellmapi:3001/v1/chat/completions",
+            "AI_API_KEY": "test-key",
+            "ARCHITECT_MODEL": "auto:reliable",
+            "WORKER_MODEL": "auto:coding",
+            "SPECIALIST_MODEL": "auto:research",
+        }
+        with patch.dict(os.environ, env, clear=False):
+            agent = Orchestrator()
+        self.assertEqual(agent.architect_model, "auto:reliable")
+        self.assertEqual(agent.worker_model, "auto:coding")
+        self.assertEqual(agent.specialist_model, "auto:research")
+
+    def test_specialist_model_defaults_to_worker_chain(self):
+        env = {
+            "AI_BASE_URL": "http://freellmapi:3001/v1/chat/completions",
+            "AI_API_KEY": "test-key",
+            "WORKER_MODEL": "auto:coding",
+            "SPECIALIST_MODEL": "",
+        }
+        with patch.dict(os.environ, env, clear=False):
+            agent = Orchestrator()
+        self.assertEqual(agent.specialist_model, "auto:coding")
+
     def test_planning_failure_is_reported_and_falls_back(self):
         with patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-key"}, clear=False):
             agent = Orchestrator()
