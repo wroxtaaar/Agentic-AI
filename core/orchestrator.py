@@ -316,9 +316,18 @@ class Orchestrator:
                 msg = self._request(self.worker_model, messages, list(self.tools.values()))
             except Exception as exc:
                 return {
-                    "success": False, "answer": f"Worker model request failed: {exc}",
-                    "specialists": specialists, "trace": trace, "architect_plan": plan,
+                    "success": False,
+                    "answer": f"Worker model request failed: {exc}",
+                    "architect_plan": plan,
+                    "specialist_reports": specialist_reports,
+                    "architect_review": "Skipped because the worker request failed before producing a report.",
+                    "architect_model": self.architect_model,
+                    "worker_model": self.worker_model,
+                    "specialist_model": self.specialist_model,
                     "planning_error": planning_error,
+                    "review_error": "Skipped because the worker request failed before producing a report.",
+                    "specialists": specialists,
+                    "trace": trace,
                 }
             calls = msg.get("tool_calls") or []
             messages.append(
