@@ -9,7 +9,7 @@ A self-hosted multi-agent engineering control plane for managing software projec
 - **Specialists** — project discovery, coding, DevOps, Git, debugging, security, verification and memory.
 - **Verification** — runs bounded project-aware syntax, test and build checks.
 
-The architect and worker can use different model IDs behind an OpenAI Chat Completions gateway. For coding tasks, the worker can create a detached Git worktree, edit files only inside that worktree, run bounded project-aware checks, repair failures, and submit a diff for approval. Applying the verified diff to the original checkout requires approval; committing and pushing remain separate approval-gated actions.
+The architect, worker, and delegated specialists can use different model IDs or FreeLLMAPI fallback chains behind an OpenAI Chat Completions gateway. Specialists currently use the worker model chain. For coding tasks, the worker can create a detached Git worktree, edit files only inside that worktree, run bounded project-aware checks, repair failures, and submit a diff for approval. Applying the verified diff to the original checkout requires approval; committing and pushing remain separate approval-gated actions.
 
 ## Free model gateway (FreeLLMAPI)
 
