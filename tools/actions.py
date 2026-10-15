@@ -6,6 +6,7 @@ from tools.memory import save_approved
 from tools.patches import apply as apply_patch, rollback as rollback_patch, load as load_patch
 from tools.git_actions import execute_commit
 from tools.verify import project_verify
+from tools.coding_workspace import apply_approved_workspace_patch
 
 DOCKER_KINDS = {"docker_restart", "docker_start", "docker_stop"}
 
@@ -18,6 +19,11 @@ def execute_approved(aid):
 
     kind = item.get("kind")
     payload = item.get("payload") or {}
+
+    if kind == "workspace_patch":
+        result = apply_approved_workspace_patch(payload)
+        set_status(aid, "executed" if result.get("success") else "failed")
+        return {"approval_id": aid, "kind": kind, **result}
 
     if kind in DOCKER_KINDS:
         action = payload.get("action")

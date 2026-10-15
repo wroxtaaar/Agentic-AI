@@ -8,6 +8,10 @@ from tools.git_actions import propose_commit
 from tools.patches import propose
 from tools.memory import save as memory_save, search as memory_search
 from tools.verify import python_syntax, project_markers, project_verify
+from tools.coding_workspace import (
+    create_workspace, read_workspace_file, write_workspace_file,
+    verify_workspace, finalize_workspace,
+)
 
 def build_tools():
     def t(name,desc,fn,props=None,required=None):
@@ -38,4 +42,9 @@ def build_tools():
       t('verify_project','Run a bounded, project-aware verification check. Read-only; auto selects syntax/tests/build checks based on project type.',project_verify,{'path':{'type':'string'},'mode':{'type':'string','enum':['auto','syntax','test','build']},'timeout':{'type':'integer'}},['path']),
       t('project_type','Detect basic project type.',project_markers,{'path':{'type':'string'}},['path']),
       t('create_patch_proposal','Create an exact coding proposal. Does not edit source.',propose,{'project':{'type':'string'},'problem':{'type':'string'},'explanation':{'type':'string'},'edits':{'type':'array','items':{'type':'object'}}},['project','problem','explanation','edits']),
+      t('coding_workspace_create','Create a detached isolated Git worktree for autonomous coding. Refuses dirty source checkouts.',create_workspace,{'project':{'type':'string'}},['project']),
+      t('coding_read_file','Read a non-secret file from an isolated coding workspace.',read_workspace_file,{'workspace_id':{'type':'string'},'file':{'type':'string'}},['workspace_id','file']),
+      t('coding_write_file','Write or create a text file ONLY in the isolated coding worktree. Max 256 KB per file.',write_workspace_file,{'workspace_id':{'type':'string'},'file':{'type':'string'},'content':{'type':'string'}},['workspace_id','file','content']),
+      t('coding_verify','Run bounded project-aware syntax/tests/build checks in an isolated workspace. Use after edits and repair failures within the task budget.',verify_workspace,{'workspace_id':{'type':'string'},'mode':{'type':'string','enum':['auto','syntax','test','build']},'timeout':{'type':'integer'}},['workspace_id']),
+      t('coding_finalize','After successful verification, show the diff and create a pending approval to apply it to the original checkout. Does not apply, commit or push.',finalize_workspace,{'workspace_id':{'type':'string'},'summary':{'type':'string'}},['workspace_id','summary']),
     ]
