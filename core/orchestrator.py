@@ -147,7 +147,9 @@ class Orchestrator:
         }
 
     def run(self, user, history=None):
-        direct_result = self._direct_read_only_git(user)\n        if direct_result is not None:\n            return direct_result\n        specialists = self.specialists(user)
+        direct_result = self._direct_read_only_git(user)
+        if direct_result is not None:
+            return direct_result\n        specialists = self.specialists(user)
         missions = "; ".join(
             f"{s.name}: {s.mission}" for s in SPECIALISTS if s.name in specialists
         )
