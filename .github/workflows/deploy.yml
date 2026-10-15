@@ -71,6 +71,8 @@ jobs:
             docker compose config --quiet
             echo "==> Building Agentic-AI image"
             docker compose build --pull
+            echo "==> Verifying Git is installed in the agent image"
+            docker compose run --rm --no-deps agent git --version
             echo "==> Running tests in the image"
             docker compose run --rm --no-deps agent python -m py_compile app.py core/*.py agents/*.py tools/*.py
             docker compose run --rm --no-deps agent python -m unittest discover -s tests -p 'test_*.py' -v
