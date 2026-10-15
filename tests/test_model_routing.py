@@ -97,12 +97,14 @@ class ModelRoutingTests(unittest.TestCase):
         calls, invalid = Orchestrator._valid_tool_calls([
             {"id": "good", "function": {"name": "read_file", "arguments": '{"path":"README.md"}'}},
             None,
-            {"function": "not-an-object"},
-            {"function": {"name": "", "arguments": "{}"}},
-            {"function": {"name": "read_file", "arguments": {}}},
+            {"id": "missing-function", "function": "not-an-object"},
+            {"id": "empty-name", "function": {"name": "", "arguments": "{}"}},
+            {"id": "bad-arguments", "function": {"name": "read_file", "arguments": {}}},
+            {"function": {"name": "read_file", "arguments": "{}"}},
+            {"id": "", "function": {"name": "read_file", "arguments": "{}"}},
         ])
         self.assertEqual(len(calls), 1)
-        self.assertEqual(invalid, 4)
+        self.assertEqual(invalid, 6)
 
     def test_tool_calls_reject_non_list_payload(self):
         calls, invalid = Orchestrator._valid_tool_calls({"function": {"name": "read_file"}})

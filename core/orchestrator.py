@@ -64,6 +64,9 @@ class Orchestrator:
             if not isinstance(call, dict):
                 invalid += 1
                 continue
+            if not isinstance(call.get("id"), str) or not call["id"].strip():
+                invalid += 1
+                continue
             function = call.get("function")
             if not isinstance(function, dict) or not isinstance(function.get("name"), str) or not function["name"].strip():
                 invalid += 1
