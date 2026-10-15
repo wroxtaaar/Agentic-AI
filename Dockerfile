@@ -5,10 +5,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# The agent talks to the host Docker daemon through the mounted
-# /var/run/docker.sock, so only the Docker CLI is required in the image.
+# Git powers the dedicated read-only Git tools. The agent talks to the host
+# Docker daemon through the mounted socket, so only the Docker CLI is needed.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
+    && apt-get install -y --no-install-recommends ca-certificates curl gnupg git \
     && install -m 0755 -d /etc/apt/keyrings \
     && curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc \
     && chmod a+r /etc/apt/keyrings/docker.asc \
