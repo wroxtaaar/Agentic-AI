@@ -28,6 +28,23 @@ class SpecialistToolPermissionTests(unittest.TestCase):
         self.assertIn("Skipped", result["architect_review"])
         review.assert_not_called()
 
+    def test_worker_request_failure_preserves_specialist_evidence(self):
+        agent = Orchestrator()
+        reports = [{"agent": "project", "success": True, "report": "Found project files."}]
+        with patch.object(agent, "_direct_read_only_git", return_value=None), \
+             patch.object(agent, "specialists", return_value=["project"]), \
+             patch.object(agent, "_architect_plan", return_value=("plan", None)), \
+             patch.object(agent, "_specialist_investigations", return_value=reports), \
+             patch.object(agent, "_request", side_effect=RuntimeError("provider rate limited")):
+            result = agent.run("Investigate the project")
+
+        self.assertFalse(result["success"])
+        self.assertIn("provider rate limited", result["answer"])
+        self.assertEqual(result["specialist_reports"], reports)
+        self.assertEqual(result["architect_plan"], "plan")
+        self.assertEqual(result["worker_model"], agent.worker_model)
+        self.assertIn("Skipped", result["architect_review"])
+
     def test_empty_worker_response_is_not_usable(self):
         self.assertFalse(Orchestrator._worker_response_is_usable(""))
         self.assertFalse(Orchestrator._worker_response_is_usable("  \n"))
