@@ -42,6 +42,30 @@ class SpecialistAgentTests(unittest.TestCase):
         self.assertEqual(reports[0]["tool_calls"], 1)
         self.assertEqual(reports[0]["tool_trace"][0]["tool"], "git_status")
 
+    def test_specialist_rejects_empty_tool_arguments(self):
+        calls = []
+        self.agent.tools = {
+            "git_status": {
+                "name": "git_status",
+                "description": "Read Git status",
+                "schema": {"type": "object", "properties": {}, "required": []},
+                "function": lambda: calls.append("git_status") or {"success": True},
+            }
+        }
+        responses = [
+            {"tool_calls": [{
+                "id": "call-empty",
+                "function": {"name": "git_status", "arguments": ""},
+            }]},
+            {"content": "I could not inspect Git status because the tool arguments were malformed."},
+        ]
+        with patch.object(self.agent, "_request", side_effect=responses):
+            reports = self.agent._specialist_investigations("Check Git", "Inspect status", ["git"])
+        self.assertEqual(calls, [])
+        self.assertTrue(reports[0]["success"])
+        self.assertFalse(reports[0]["tool_trace"][0]["success"])
+        self.assertIn("non-empty JSON object", reports[0]["tool_trace"][0]["error"])
+
     def test_specialist_cannot_execute_mutating_tool(self):
         calls = []
         self.agent.tools = {
