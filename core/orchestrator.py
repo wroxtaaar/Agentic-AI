@@ -104,6 +104,8 @@ class Orchestrator:
 
     def _request(self, model, messages, tools=None, temperature=0.1):
         if not self.api_key:
+            if "freellmapi" in self.base_url.lower():
+                raise RuntimeError("AI_API_KEY is not configured for the FreeLLMAPI gateway")
             raise RuntimeError("AI_API_KEY or OPENROUTER_API_KEY is not configured")
         payload = {"model": model, "messages": messages, "temperature": temperature}
         if tools:
