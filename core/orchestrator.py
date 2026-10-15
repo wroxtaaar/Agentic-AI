@@ -109,7 +109,7 @@ class Orchestrator:
     def _direct_read_only_git(self, user):
         """Run explicit, read-only Git inspection requests without spending inference quota."""
         low = user.lower()
-        forbidden = ("modify", "edit ", "change ", "commit", "push ", "write ", "delete ", "reset ", "checkout ")
+        forbidden = ("please modify", "make changes", "edit the", "commit changes", "push changes", "delete the", "reset the repo", "checkout another branch")
         if any(term in low for term in forbidden):
             return None
         inspection_words = ("inspect", "show", "report", "check", "status", "branch", "log", "history", "untracked", "read-only", "read only")
