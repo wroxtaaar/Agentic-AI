@@ -54,6 +54,19 @@ class Orchestrator:
         return name in allowed_names and name in readonly_names and name in tools
 
     @staticmethod
+    def _parse_tool_arguments(raw_args):
+        """Parse tool arguments fail-closed; malformed payloads must never become empty arguments."""
+        if not isinstance(raw_args, str) or not raw_args.strip():
+            return None, "Tool arguments must be a non-empty JSON object."
+        try:
+            args = json.loads(raw_args)
+        except (TypeError, json.JSONDecodeError):
+            return None, "Tool arguments contained invalid JSON."
+        if not isinstance(args, dict):
+            return None, "Tool arguments must decode to a JSON object."
+        return args, None
+
+    @staticmethod
     def _worker_response_is_usable(report_text):
         """A blank assistant response is not evidence of task completion."""
         return bool((report_text or "").strip())
@@ -222,12 +235,11 @@ class Orchestrator:
                     for call in calls:
                         function = call.get("function") or {}
                         tool_name = function.get("name", "")
-                        try:
-                            args = json.loads(function.get("arguments") or "{}")
-                        except (TypeError, json.JSONDecodeError):
-                            args = {}
+                        args, args_error = self._parse_tool_arguments(function.get("arguments"))
                         if calls_used >= 3:
                             result = {"success": False, "error": "Specialist tool-call budget reached."}
+                        elif args_error:
+                            result = {"success": False, "error": args_error}
                         elif not self._specialist_tool_is_allowed(tool_name, allowed_names, readonly_names, self.tools):
                             result = {"success": False, "error": "Tool not permitted for specialist investigations."}
                         else:
@@ -373,10 +385,14 @@ class Orchestrator:
             for call in calls:
                 name = call.get("function", {}).get("name", "")
                 raw_args = call.get("function", {}).get("arguments") or "{}"
-                try:
-                    args = json.loads(raw_args)
-                except (TypeError, json.JSONDecodeError):
-                    args = {}
+                args, args_error = self._parse_tool_arguments(raw_args)
+                if args_error:
+                    trace.append({"tool": name, "success": False, "error": args_error})
+                    messages.append({
+                        "role": "tool", "tool_call_id": call.get("id", ""),
+                        "content": json.dumps({"success": False, "error": args_error}),
+                    })
+                    continue
                 signature = json.dumps([name, args], sort_keys=True, default=str)
                 repeated_calls[signature] = repeated_calls.get(signature, 0) + 1
                 if repeated_calls[signature] > 3:
