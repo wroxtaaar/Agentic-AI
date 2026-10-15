@@ -51,6 +51,48 @@ class ModelRoutingTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "AI_API_KEY is not configured for the FreeLLMAPI gateway"):
             agent._request("auto", [{"role": "user", "content": "hello"}])
 
+    def test_invalid_json_gateway_response_has_clear_error(self):
+        env = {
+            "AI_BASE_URL": "http://freellmapi:3001/v1/chat/completions",
+            "AI_API_KEY": "test-key",
+        }
+        with patch.dict(os.environ, env, clear=False):
+            agent = Orchestrator()
+        response = unittest.mock.Mock()
+        response.raise_for_status.return_value = None
+        response.json.side_effect = ValueError("not json")
+        with patch("core.orchestrator.httpx.post", return_value=response):
+            with self.assertRaisesRegex(RuntimeError, "AI gateway returned invalid JSON"):
+                agent._request("auto", [{"role": "user", "content": "hello"}])
+
+    def test_non_object_gateway_response_has_clear_error(self):
+        env = {
+            "AI_BASE_URL": "http://freellmapi:3001/v1/chat/completions",
+            "AI_API_KEY": "test-key",
+        }
+        with patch.dict(os.environ, env, clear=False):
+            agent = Orchestrator()
+        response = unittest.mock.Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = ["unexpected"]
+        with patch("core.orchestrator.httpx.post", return_value=response):
+            with self.assertRaisesRegex(RuntimeError, "AI gateway returned an unexpected response format"):
+                agent._request("auto", [{"role": "user", "content": "hello"}])
+
+    def test_malformed_choice_has_clear_error(self):
+        env = {
+            "AI_BASE_URL": "http://freellmapi:3001/v1/chat/completions",
+            "AI_API_KEY": "test-key",
+        }
+        with patch.dict(os.environ, env, clear=False):
+            agent = Orchestrator()
+        response = unittest.mock.Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {"choices": ["not-an-object"]}
+        with patch("core.orchestrator.httpx.post", return_value=response):
+            with self.assertRaisesRegex(RuntimeError, "AI gateway returned no assistant message"):
+                agent._request("auto", [{"role": "user", "content": "hello"}])
+
     def test_freellmapi_uses_only_its_gateway_key(self):
         env = {
             "AI_BASE_URL": "http://freellmapi:3001/v1/chat/completions",
