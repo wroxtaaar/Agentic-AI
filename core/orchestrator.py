@@ -26,6 +26,16 @@ REVIEW_SYSTEM = """You are the senior architect reviewing a coding agent's repor
 Check whether the report follows the plan, distinguishes evidence from assumptions, includes verification results, and respects approval boundaries.
 Do not claim to independently inspect files or run tests. If tests were not run, say so. Return a concise review with: assessment, gaps, and next step."""
 
+# Explicit security boundary: only these tool names are eligible for specialist calls.
+# Keep this independent of role allowlists so adding a tool to a role cannot silently
+# make a mutation-capable tool available to specialists.
+SPECIALIST_READONLY_TOOL_NAMES = {
+    "system_info", "discover_projects", "project_audit", "project_structure",
+    "read_file", "read_files", "shell_readonly", "docker_list", "docker_logs",
+    "docker_inspect", "docker_stats", "git_status", "git_branch", "git_log",
+    "git_diff", "memory_search", "verify_python", "verify_project", "project_type",
+}
+
 SPECIALIST_REVIEW_GUIDANCE = {
     "project": "Check repository context and relevant project area without guessing.",
     "research": "Gather source-backed evidence from documentation and project files, compare alternatives, and clearly label unknowns; do not claim web research unless a web tool was actually used.",
@@ -143,7 +153,7 @@ class Orchestrator:
             "security": {"project_audit", "project_structure", "read_file", "read_files", "git_status", "git_diff"},
             "verifier": {"project_structure", "read_file", "read_files", "project_type", "verify_python", "verify_project"},
         }
-        readonly_names = set().union(*specialist_tool_allowlists.values())
+        readonly_names = SPECIALIST_READONLY_TOOL_NAMES
         selected = [name for name in specialists if name in SPECIALIST_REVIEW_GUIDANCE][:max_agents]
         for name in selected:
             allowed_names = specialist_tool_allowlists.get(name, {"project_audit", "project_structure", "read_file", "read_files"})
