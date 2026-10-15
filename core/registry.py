@@ -16,6 +16,7 @@ from tools.coding_workspace import (
 def build_tools():
     def t(name,desc,fn,props=None,required=None):
         return {'name':name,'description':desc,'function':fn,'schema':{'type':'object','properties':props or {},'required':required or [],'additionalProperties':False}}
+    git_path={'path':{'type':'string','description':'Optional repository directory or path inside it. If omitted, safely resolve the configured/default project repository.'}}
     return [
       t('system_info','Get VPS system information.',info),
       t('discover_projects','Find Git repositories under configured workspace roots.',discover,{'limit':{'type':'integer'},'max_depth':{'type':'integer'}}),
@@ -31,10 +32,10 @@ def build_tools():
       t('docker_restart','PROPOSAL ONLY: request approval to restart a Docker container. Does not restart it.',propose_restart,{'container':{'type':'string'}},['container']),
       t('docker_start','PROPOSAL ONLY: request approval to start a Docker container. Does not start it.',propose_start,{'container':{'type':'string'}},['container']),
       t('docker_stop','PROPOSAL ONLY: request approval to stop a Docker container. Does not stop it.',propose_stop,{'container':{'type':'string'}},['container']),
-      t('git_status','Show repository status.',status,{'path':{'type':'string'}},['path']),
-      t('git_branch','Show current branch.',branch,{'path':{'type':'string'}},['path']),
-      t('git_log','Show recent commits.',log,{'path':{'type':'string'},'count':{'type':'integer'}},['path']),
-      t('git_diff','Show unstaged diff statistics.',diff,{'path':{'type':'string'}},['path']),
+      t('git_status','Show the configured/default repository status; pass path only when inspecting a different repository.',status,git_path),
+      t('git_branch','Show the configured/default repository branch; pass path only when inspecting a different repository.',branch,git_path),
+      t('git_log','Show recent commits in the configured/default repository; pass path only when inspecting a different repository.',log,{...git_path,count:{type:'integer'} }),
+      t('git_diff','Show unstaged diff statistics for the configured/default repository; pass path only when inspecting a different repository.',diff,git_path),
       t('git_commit','PROPOSAL ONLY: request approval to create a local Git commit. Does not commit.',propose_commit,{'path':{'type':'string'},'message':{'type':'string'}},['path','message']),
       t('memory_save','PROPOSAL ONLY: request approval to save durable non-secret project memory.',memory_save,{'content':{'type':'string'},'project':{'type':'string'}},['content']),
       t('memory_search','Search durable project memory.',memory_search,{'query':{'type':'string'},'project':{'type':'string'}},['query']),
