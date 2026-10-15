@@ -28,12 +28,13 @@ Do not claim to independently inspect files or run tests. If tests were not run,
 
 SPECIALIST_REVIEW_GUIDANCE = {
     "project": "Check repository context and relevant project area without guessing.",
+    "research": "Gather source-backed evidence from documentation and project files, compare alternatives, and clearly label unknowns; do not claim web research unless a web tool was actually used.",
     "coding": "Review implementation reasoning, changed-file scope, and correctness risks.",
     "devops": "Review operational impact, Docker/deployment risks, and supporting logs or health checks.",
     "git": "Review branch/worktree safety, diff scope, and commit/push approval boundaries.",
     "debugger": "Review causal diagnosis; separate observed facts from hypotheses and identify missing evidence.",
     "security": "Review secret handling, access boundaries, least privilege, and risky operations.",
-    "verifier": "Review test evidence, untested paths, and claims of success.",
+    "verifier": "Act as QA: review test evidence, coverage, regression risks, untested paths, and claims of success.",
 }
 
 class Orchestrator:
