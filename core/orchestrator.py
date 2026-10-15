@@ -53,6 +53,21 @@ class Orchestrator:
         """Fail closed unless a specialist tool is explicitly allowlisted and registered read-only."""
         return name in allowed_names and name in readonly_names and name in tools
 
+    @staticmethod
+    def _build_specialist_report(name, report_text, trace, calls_used):
+        """Represent empty specialist output as unavailable, never as a successful review."""
+        report_text = (report_text or "").strip()
+        return {
+            "agent": name,
+            "success": bool(report_text),
+            "report": report_text or (
+                "Specialist returned no findings after its investigation; "
+                "treat this review as unavailable, not as a successful assessment."
+            ),
+            "tool_trace": trace,
+            "tool_calls": calls_used,
+        }
+
     def __init__(self):
         self.tools = {x["name"]: x for x in build_tools()}
         self.base_url = os.getenv(
@@ -184,15 +199,9 @@ class Orchestrator:
                         if calls else {"role": "assistant", "content": message.get("content") or ""}
                     )
                     if not calls:
-                        report_text = (message.get("content") or "").strip()
-                        reports.append({
-                            "agent": name, "success": bool(report_text),
-                            "report": report_text or (
-                                "Specialist returned no findings after its investigation; "
-                                "treat this review as unavailable, not as a successful assessment."
-                            ),
-                            "tool_trace": trace, "tool_calls": calls_used,
-                        })
+                        reports.append(
+                            self._build_specialist_report(name, message.get("content"), trace, calls_used)
+                        )
                         break
                     for call in calls:
                         function = call.get("function") or {}
