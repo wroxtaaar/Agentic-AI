@@ -109,6 +109,13 @@ class ModelRoutingTests(unittest.TestCase):
         self.assertEqual(calls, [])
         self.assertEqual(invalid, 1)
 
+    def test_tool_calls_reject_falsey_non_list_payloads(self):
+        for raw in ("", 0, False):
+            with self.subTest(raw=raw):
+                calls, invalid = Orchestrator._valid_tool_calls(raw)
+                self.assertEqual(calls, [])
+                self.assertEqual(invalid, 1)
+
     def test_tool_arguments_reject_invalid_json(self):
         args, error = Orchestrator._parse_tool_arguments("{not-json")
         self.assertIsNone(args)

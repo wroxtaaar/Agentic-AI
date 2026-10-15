@@ -243,7 +243,7 @@ class Orchestrator:
             try:
                 for _ in range(max_rounds):
                     message = self._request(self.specialist_model, messages, readonly_tools)
-                    calls, malformed_calls = self._valid_tool_calls(message.get("tool_calls") or [])
+                    calls, malformed_calls = self._valid_tool_calls(message.get("tool_calls"))
                     if malformed_calls:
                         trace.append({"tool": "tool_calls", "success": False, "error": f"Rejected {malformed_calls} malformed specialist tool call(s)."})
                     messages.append(
@@ -375,7 +375,7 @@ class Orchestrator:
                     "specialists": specialists,
                     "trace": trace,
                 }
-            calls, malformed_calls = self._valid_tool_calls(msg.get("tool_calls") or [])
+            calls, malformed_calls = self._valid_tool_calls(msg.get("tool_calls"))
             if malformed_calls:
                 trace.append({"tool": "tool_calls", "success": False, "error": f"Rejected {malformed_calls} malformed worker tool call(s)."})
             messages.append(
