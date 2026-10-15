@@ -126,15 +126,23 @@ class Orchestrator:
         reports = []
         max_agents = max(1, min(int(os.getenv("MAX_SPECIALIST_AGENTS", "3")), 5))
         max_rounds = max(1, min(int(os.getenv("SPECIALIST_MAX_TURNS", "3")), 4))
-        readonly_names = {
-            "system_info", "discover_projects", "project_audit", "project_structure",
-            "read_file", "read_files", "shell_readonly", "docker_list", "docker_logs",
-            "docker_inspect", "docker_stats", "git_status", "git_branch", "git_log",
-            "git_diff", "memory_search", "project_type", "verify_project",
+        # Each specialist receives only the read-only tools needed for its role.
+        # Mutation-capable coding workspace and approval tools remain with the main worker.
+        specialist_tool_allowlists = {
+            "project": {"system_info", "discover_projects", "project_audit", "project_structure", "read_file", "read_files", "project_type", "memory_search"},
+            "research": {"discover_projects", "project_audit", "project_structure", "read_file", "read_files", "project_type", "memory_search", "shell_readonly"},
+            "coding": {"project_audit", "project_structure", "read_file", "read_files", "project_type", "git_status", "git_diff", "git_log", "verify_project"},
+            "devops": {"system_info", "docker_list", "docker_logs", "docker_inspect", "docker_stats", "shell_readonly"},
+            "git": {"git_status", "git_branch", "git_log", "git_diff"},
+            "debugger": {"project_audit", "project_structure", "read_file", "read_files", "shell_readonly", "docker_logs", "docker_inspect", "verify_project"},
+            "security": {"project_audit", "project_structure", "read_file", "read_files", "git_status", "git_diff"},
+            "verifier": {"project_structure", "read_file", "read_files", "project_type", "verify_python", "verify_project"},
         }
-        readonly_tools = [tool for name, tool in self.tools.items() if name in readonly_names]
+        readonly_names = set().union(*specialist_tool_allowlists.values())
         selected = [name for name in specialists if name in SPECIALIST_REVIEW_GUIDANCE][:max_agents]
         for name in selected:
+            allowed_names = specialist_tool_allowlists.get(name, {"project_audit", "project_structure", "read_file", "read_files"})
+            readonly_tools = [tool for tool_name, tool in self.tools.items() if tool_name in allowed_names and tool_name in readonly_names]
             system = (
                 "You are a delegated specialist agent in a self-hosted engineering team. "
                 "Investigate the task from your assigned perspective using only the supplied read-only tools. "
