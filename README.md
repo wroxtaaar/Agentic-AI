@@ -6,10 +6,10 @@ A self-hosted multi-agent engineering control plane for managing software projec
 
 - **Architect** — plans work before execution and reviews the worker's report afterward.
 - **Worker/orchestrator** — uses repository and VPS tools to investigate and produce exact patch proposals.
-- **Specialists** — project discovery, coding, DevOps, Git, debugging, security, verification and memory.
+- **Specialists** — project discovery, research, coding, DevOps, Git, debugging, security review, QA/verification and memory. Each delegated specialist gets a bounded, read-only tool investigation and returns an evidence-backed report; the worker retains the full tool set for approved workflows.
 - **Verification** — runs bounded project-aware syntax, test and build checks.
 
-The architect, worker, and delegated specialists can use different model IDs or FreeLLMAPI fallback chains behind an OpenAI Chat Completions gateway. Specialists currently use the worker model chain. For coding tasks, the worker can create a detached Git worktree, edit files only inside that worktree, run bounded project-aware checks, repair failures, and submit a diff for approval. Applying the verified diff to the original checkout requires approval; committing and pushing remain separate approval-gated actions.
+The architect, worker, and delegated specialists can use different model IDs or FreeLLMAPI fallback chains behind an OpenAI Chat Completions gateway. Specialists use `SPECIALIST_MODEL` when configured, otherwise the worker model chain. For coding tasks, the worker can create a detached Git worktree, edit files only inside that worktree, run bounded project-aware checks, repair failures, and submit a diff for approval. Applying the verified diff to the original checkout requires approval; committing and pushing remain separate approval-gated actions.
 
 ## Free model gateway (FreeLLMAPI)
 
