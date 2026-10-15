@@ -52,6 +52,8 @@ class Orchestrator:
         default_model = "auto" if is_freellmapi else legacy_model
         self.architect_model = os.getenv("ARCHITECT_MODEL") or default_model
         self.worker_model = os.getenv("WORKER_MODEL") or default_model
+        # Specialists can use a separate FreeLLMAPI fallback chain; default to the worker chain.
+        self.specialist_model = os.getenv("SPECIALIST_MODEL") or self.worker_model
         self.max_turns = max(1, min(int(os.getenv("MAX_AGENT_TURNS", "8")), 40))
         self.timeout = max(10, min(int(os.getenv("AI_REQUEST_TIMEOUT", "120")), 300))
 
@@ -151,7 +153,7 @@ class Orchestrator:
             calls_used = 0
             try:
                 for _ in range(max_rounds):
-                    message = self._request(self.worker_model, messages, readonly_tools)
+                    message = self._request(self.specialist_model, messages, readonly_tools)
                     calls = message.get("tool_calls") or []
                     messages.append(
                         {"role": "assistant", "content": message.get("content") or "", "tool_calls": calls}
@@ -242,7 +244,7 @@ class Orchestrator:
             "success": success, "answer": answer, "specialists": ["git"],
             "trace": trace, "architect_plan": "Direct read-only Git dispatch; no inference calls used.",
             "planning_error": None, "review_error": "Skipped for deterministic read-only Git inspection.",
-            "worker_model": None, "architect_model": None,
+            "worker_model": None, "architect_model": None, "specialist_model": None,
         }
 
     def run(self, user, history=None):
@@ -288,7 +290,7 @@ class Orchestrator:
                     "success": True, "answer": worker_answer, "architect_plan": plan,
                     "specialist_reports": specialist_reports,
                     "architect_review": review, "architect_model": self.architect_model,
-                    "worker_model": self.worker_model, "planning_error": planning_error,
+                    "worker_model": self.worker_model, "specialist_model": self.specialist_model, "planning_error": planning_error,
                     "review_error": review_error, "specialists": specialists, "trace": trace,
                 }
             for call in calls:
