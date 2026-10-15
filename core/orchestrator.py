@@ -54,6 +54,27 @@ class Orchestrator:
         return name in allowed_names and name in readonly_names and name in tools
 
     @staticmethod
+    def _valid_tool_calls(raw_calls):
+        """Keep only structurally valid tool calls; malformed provider data is not executable."""
+        if not isinstance(raw_calls, list):
+            return [], 1 if raw_calls else 0
+        valid = []
+        invalid = 0
+        for call in raw_calls:
+            if not isinstance(call, dict):
+                invalid += 1
+                continue
+            function = call.get("function")
+            if not isinstance(function, dict) or not isinstance(function.get("name"), str) or not function["name"].strip():
+                invalid += 1
+                continue
+            if not isinstance(function.get("arguments"), str):
+                invalid += 1
+                continue
+            valid.append(call)
+        return valid, invalid
+
+    @staticmethod
     def _parse_tool_arguments(raw_args):
         """Parse tool arguments fail-closed; malformed payloads must never become empty arguments."""
         if not isinstance(raw_args, str) or not raw_args.strip():
@@ -222,7 +243,9 @@ class Orchestrator:
             try:
                 for _ in range(max_rounds):
                     message = self._request(self.specialist_model, messages, readonly_tools)
-                    calls = message.get("tool_calls") or []
+                    calls, malformed_calls = self._valid_tool_calls(message.get("tool_calls") or [])
+                    if malformed_calls:
+                        trace.append({"tool": "tool_calls", "success": False, "error": f"Rejected {malformed_calls} malformed specialist tool call(s)."})
                     messages.append(
                         {"role": "assistant", "content": message.get("content") or "", "tool_calls": calls}
                         if calls else {"role": "assistant", "content": message.get("content") or ""}
@@ -352,7 +375,9 @@ class Orchestrator:
                     "specialists": specialists,
                     "trace": trace,
                 }
-            calls = msg.get("tool_calls") or []
+            calls, malformed_calls = self._valid_tool_calls(msg.get("tool_calls") or [])
+            if malformed_calls:
+                trace.append({"tool": "tool_calls", "success": False, "error": f"Rejected {malformed_calls} malformed worker tool call(s)."})
             messages.append(
                 {"role": "assistant", "content": msg.get("content") or "", "tool_calls": calls}
                 if calls else {"role": "assistant", "content": msg.get("content") or ""}
