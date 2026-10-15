@@ -184,7 +184,7 @@ class Orchestrator:
                             args = {}
                         if calls_used >= 3:
                             result = {"success": False, "error": "Specialist tool-call budget reached."}
-                        elif tool_name not in readonly_names or tool_name not in self.tools:
+                        elif tool_name not in allowed_names or tool_name not in readonly_names or tool_name not in self.tools:
                             result = {"success": False, "error": "Tool not permitted for specialist investigations."}
                         else:
                             try:
