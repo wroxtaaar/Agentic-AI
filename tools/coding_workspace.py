@@ -117,13 +117,27 @@ def finalize_workspace(workspace_id, summary):
     # Include new files in the diff without staging their contents.
     intent = _run(["git", "add", "-N", "."], worktree, 30)
     if not intent.get("success"): return {"success": False, "error": "Could not prepare diff", "details": intent}
-    patch = _run(["git", "diff", "--binary", "HEAD", "--", ".", ":(exclude)**/.env", ":(exclude)**/.env.*"], worktree, 30)
-    if not patch.get("success"): return {"success": False, "error": "Could not create patch", "details": patch}
-    diff = patch.get("stdout", "")
-    if not diff.strip(): return {"success": False, "error": "No changes found in workspace"}
-    if len(diff.encode("utf-8")) > MAX_PATCH_BYTES: return {"success": False, "error": "Patch exceeds 2 MB limit"}
+    # Keep patch bytes intact; _run() truncates/redacts output for display.
+    try:
+        raw_patch = subprocess.run(
+            ["git", "diff", "--binary", "HEAD", "--", ".", ":(exclude)**/.env", ":(exclude)**/.env.*"],
+            cwd=worktree, capture_output=True, timeout=30
+        )
+    except subprocess.TimeoutExpired:
+        return {"success": False, "error": "Timed out while creating patch"}
+    except Exception as exc:
+        return {"success": False, "error": f"Could not create patch: {exc}"}
+    if raw_patch.returncode != 0:
+        return {"success": False, "error": "Could not create patch",
+                "details": {"return_code": raw_patch.returncode,
+                            "stderr": redact(raw_patch.stderr.decode("utf-8", errors="replace"), 4000)}}
+    patch_bytes = raw_patch.stdout
+    if len(patch_bytes) > MAX_PATCH_BYTES:
+        return {"success": False, "error": "Patch exceeds 2 MB limit"}
+    if not patch_bytes.strip(): return {"success": False, "error": "No changes found in workspace"}
+    diff = patch_bytes.decode("utf-8", errors="replace")
     patch_path = _meta_dir() / f"{item['id']}.patch"
-    patch_path.write_text(diff, encoding="utf-8")
+    patch_path.write_bytes(patch_bytes)
     approval = create("workspace_patch", f"Apply verified coding workspace {item['id']}: {summary[:180]}", {
         "workspace_id": item["id"], "project": str(root), "patch_path": str(patch_path),
         "base_commit": item["base_commit"], "summary": summary[:2000]
