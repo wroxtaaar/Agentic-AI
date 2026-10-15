@@ -125,10 +125,19 @@ class Orchestrator:
             headers["X-Title"] = app_name
         response = httpx.post(self.base_url, headers=headers, json=payload, timeout=self.timeout)
         response.raise_for_status()
-        choices = response.json().get("choices") or []
-        if not choices or not isinstance(choices[0].get("message"), dict):
+        try:
+            body = response.json()
+        except (ValueError, json.JSONDecodeError) as exc:
+            raise RuntimeError("AI gateway returned invalid JSON") from exc
+        if not isinstance(body, dict):
+            raise RuntimeError("AI gateway returned an unexpected response format")
+        choices = body.get("choices")
+        if not isinstance(choices, list) or not choices:
             raise RuntimeError("AI gateway returned no assistant message")
-        return choices[0]["message"]
+        first_choice = choices[0]
+        if not isinstance(first_choice, dict) or not isinstance(first_choice.get("message"), dict):
+            raise RuntimeError("AI gateway returned no assistant message")
+        return first_choice["message"]
 
     def _architect_plan(self, user, history, specialists):
         messages = [
