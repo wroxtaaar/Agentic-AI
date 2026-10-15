@@ -29,13 +29,19 @@ Do not claim to independently inspect files or run tests. If tests were not run,
 class Orchestrator:
     def __init__(self):
         self.tools = {x["name"]: x for x in build_tools()}
-        self.api_key = os.getenv("AI_API_KEY") or os.getenv("OPENROUTER_API_KEY")
         self.base_url = os.getenv(
             "AI_BASE_URL", "https://openrouter.ai/api/v1/chat/completions"
         ).rstrip("/")
+        # Never let an OpenRouter key silently become a fallback for FreeLLMAPI.
+        # FreeLLMAPI deployments must authenticate only with their gateway key.
+        is_freellmapi = "freellmapi" in self.base_url.lower()
+        self.api_key = os.getenv("AI_API_KEY") or (
+            None if is_freellmapi else os.getenv("OPENROUTER_API_KEY")
+        )
         legacy_model = os.getenv("OPENROUTER_MODEL", "openrouter/free")
-        self.architect_model = os.getenv("ARCHITECT_MODEL") or legacy_model
-        self.worker_model = os.getenv("WORKER_MODEL") or legacy_model
+        default_model = "auto" if is_freellmapi else legacy_model
+        self.architect_model = os.getenv("ARCHITECT_MODEL") or default_model
+        self.worker_model = os.getenv("WORKER_MODEL") or default_model
         self.max_turns = max(1, min(int(os.getenv("MAX_AGENT_TURNS", "24")), 40))
         self.timeout = max(10, min(int(os.getenv("AI_REQUEST_TIMEOUT", "120")), 300))
 
