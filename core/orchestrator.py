@@ -38,6 +38,11 @@ SPECIALIST_REVIEW_GUIDANCE = {
 }
 
 class Orchestrator:
+    @staticmethod
+    def _specialist_tool_is_allowed(name, allowed_names, readonly_names, tools):
+        """Fail closed unless a specialist tool is explicitly allowlisted and registered read-only."""
+        return name in allowed_names and name in readonly_names and name in tools
+
     def __init__(self):
         self.tools = {x["name"]: x for x in build_tools()}
         self.base_url = os.getenv(
@@ -184,7 +189,7 @@ class Orchestrator:
                             args = {}
                         if calls_used >= 3:
                             result = {"success": False, "error": "Specialist tool-call budget reached."}
-                        elif tool_name not in allowed_names or tool_name not in readonly_names or tool_name not in self.tools:
+                        elif not self._specialist_tool_is_allowed(tool_name, allowed_names, readonly_names, self.tools):
                             result = {"success": False, "error": "Tool not permitted for specialist investigations."}
                         else:
                             try:
