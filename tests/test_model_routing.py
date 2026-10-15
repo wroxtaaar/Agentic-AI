@@ -26,6 +26,27 @@ class ModelRoutingTests(unittest.TestCase):
         self.assertEqual(agent.worker_model, "worker/model")
         self.assertEqual(agent.base_url, env["AI_BASE_URL"])
 
+    def test_freellmapi_does_not_fall_back_to_openrouter_key(self):
+        env = {
+            "AI_BASE_URL": "http://freellmapi:3001/v1/chat/completions",
+            "AI_API_KEY": "", "OPENROUTER_API_KEY": "should-not-be-used",
+            "ARCHITECT_MODEL": "", "WORKER_MODEL": "",
+        }
+        with patch.dict(os.environ, env, clear=False):
+            agent = Orchestrator()
+        self.assertIsNone(agent.api_key)
+        self.assertEqual(agent.architect_model, "auto")
+        self.assertEqual(agent.worker_model, "auto")
+
+    def test_freellmapi_uses_only_its_gateway_key(self):
+        env = {
+            "AI_BASE_URL": "http://freellmapi:3001/v1/chat/completions",
+            "AI_API_KEY": "freellmapi-key", "OPENROUTER_API_KEY": "openrouter-key",
+        }
+        with patch.dict(os.environ, env, clear=False):
+            agent = Orchestrator()
+        self.assertEqual(agent.api_key, "freellmapi-key")
+
     def test_planning_failure_is_reported_and_falls_back(self):
         with patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-key"}, clear=False):
             agent = Orchestrator()
