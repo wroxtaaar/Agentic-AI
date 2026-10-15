@@ -42,7 +42,7 @@ class Orchestrator:
         default_model = "auto" if is_freellmapi else legacy_model
         self.architect_model = os.getenv("ARCHITECT_MODEL") or default_model
         self.worker_model = os.getenv("WORKER_MODEL") or default_model
-        self.max_turns = max(1, min(int(os.getenv("MAX_AGENT_TURNS", "24")), 40))
+        self.max_turns = max(1, min(int(os.getenv("MAX_AGENT_TURNS", "8")), 40))
         self.timeout = max(10, min(int(os.getenv("AI_REQUEST_TIMEOUT", "120")), 300))
 
     def specialists(self, text):
@@ -121,6 +121,7 @@ class Orchestrator:
         messages += (history or [])[-12:]
         messages.append({"role": "user", "content": user})
         trace = []
+        repeated_calls = {}
         for _ in range(self.max_turns):
             try:
                 msg = self._request(self.worker_model, messages, list(self.tools.values()))
@@ -146,10 +147,21 @@ class Orchestrator:
                 }
             for call in calls:
                 name = call.get("function", {}).get("name", "")
+                raw_args = call.get("function", {}).get("arguments") or "{}"
                 try:
-                    args = json.loads(call.get("function", {}).get("arguments") or "{}")
+                    args = json.loads(raw_args)
                 except (TypeError, json.JSONDecodeError):
                     args = {}
+                signature = json.dumps([name, args], sort_keys=True, default=str)
+                repeated_calls[signature] = repeated_calls.get(signature, 0) + 1
+                if repeated_calls[signature] > 3:
+                    trace.append({"tool": name, "success": False, "error": "Repeated identical tool call; stopped to prevent an inference loop."})
+                    return {
+                        "success": False,
+                        "answer": "Stopped because the worker repeated the same tool call more than three times. Review the tool trace and retry with a narrower task.",
+                        "architect_plan": plan, "specialists": specialists, "trace": trace,
+                        "planning_error": planning_error,
+                    }
                 tool = self.tools.get(name)
                 if not tool:
                     result = {"success": False, "error": "Unknown tool"}
@@ -161,7 +173,7 @@ class Orchestrator:
                 trace.append({"tool": name, "success": bool(result.get("success"))})
                 messages.append({
                     "role": "tool", "tool_call_id": call.get("id", ""),
-                    "content": json.dumps(result, default=str)[:16000],
+                    "content": json.dumps(result, default=str)[:8000],
                 })
         return {
             "success": False, "answer": "Maximum orchestration turns reached. No completion was verified.",
