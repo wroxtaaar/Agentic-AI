@@ -78,6 +78,17 @@ class Orchestrator:
         return valid, invalid
 
     @staticmethod
+    def _normalize_tool_result(result):
+        """Convert unexpected tool return values into explicit failures, never orchestration crashes."""
+        if not isinstance(result, dict):
+            return {
+                "success": False,
+                "error_type": "invalid_tool_result",
+                "error": f"Tool returned {type(result).__name__}; expected an object.",
+            }
+        return result
+
+    @staticmethod
     def _parse_tool_arguments(raw_args):
         """Parse tool arguments fail-closed; malformed payloads must never become empty arguments."""
         if not isinstance(raw_args, str) or not raw_args.strip():
@@ -273,6 +284,7 @@ class Orchestrator:
                                 result = self.tools[tool_name]["function"](**args)
                             except Exception as exc:
                                 result = {"success": False, "error_type": "tool_exception", "error": str(exc)}
+                        result = self._normalize_tool_result(result)
                         if calls_used < 3:
                             calls_used += 1
                         trace.append({
@@ -439,6 +451,7 @@ class Orchestrator:
                         result = tool["function"](**args)
                     except Exception as exc:
                         result = {"success": False, "error_type": "tool_exception", "error": str(exc)}
+                result = self._normalize_tool_result(result)
                 trace_item = {"tool": name, "success": bool(result.get("success"))}
                 if not result.get("success"):
                     # Keep enough detail to diagnose failures without exposing full tool output.

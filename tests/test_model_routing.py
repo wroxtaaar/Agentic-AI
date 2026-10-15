@@ -118,6 +118,18 @@ class ModelRoutingTests(unittest.TestCase):
                 self.assertEqual(calls, [])
                 self.assertEqual(invalid, 1)
 
+    def test_tool_result_requires_object(self):
+        for raw in (None, [], "ok", 1):
+            with self.subTest(raw=raw):
+                result = Orchestrator._normalize_tool_result(raw)
+                self.assertFalse(result["success"])
+                self.assertEqual(result["error_type"], "invalid_tool_result")
+                self.assertIn("expected an object", result["error"])
+
+    def test_tool_result_preserves_object(self):
+        raw = {"success": True, "value": "ok"}
+        self.assertIs(Orchestrator._normalize_tool_result(raw), raw)
+
     def test_tool_arguments_reject_invalid_json(self):
         args, error = Orchestrator._parse_tool_arguments("{not-json")
         self.assertIsNone(args)
