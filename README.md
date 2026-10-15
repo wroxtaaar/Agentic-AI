@@ -9,24 +9,19 @@ A self-hosted multi-agent engineering control plane for managing software projec
 - **Specialists** — project discovery, coding, DevOps, Git, debugging, security, verification and memory.
 - **Verification** — runs bounded project-aware syntax, test and build checks.
 
-The architect and worker can use different model IDs behind any compatible OpenAI Chat Completions gateway. For coding tasks, the worker can create a detached Git worktree, edit files only inside that worktree, run bounded project-aware checks, repair failures, and submit a diff for approval. Applying the verified diff to the original checkout requires approval; committing and pushing remain separate approval-gated actions. The gateway supplies model access; repository tools, shell execution, tests and approval handling remain on the VPS.
+The architect and worker can use different model IDs behind an OpenAI Chat Completions gateway. For coding tasks, the worker can create a detached Git worktree, edit files only inside that worktree, run bounded project-aware checks, repair failures, and submit a diff for approval. Applying the verified diff to the original checkout requires approval; committing and pushing remain separate approval-gated actions.
 
-## Model configuration
+## Free model gateway (FreeLLMAPI)
 
-Legacy deployments continue to work with `OPENROUTER_API_KEY` and `OPENROUTER_MODEL`. Configure these optional variables in the private VPS `.env`:
+The Docker stack runs [FreeLLMAPI](https://github.com/tashfeenahmed/freellmapi) as the local model gateway. Its dashboard/API is bound to VPS loopback at port 3001 and is not exposed publicly. The deploy workflow generates a persistent encryption key in the private VPS .env; do not rotate or delete it after provider keys have been saved.
 
-```env
-AI_BASE_URL=https://openrouter.ai/api/v1/chat/completions
-AI_API_KEY=
-OPENROUTER_API_KEY=...
-ARCHITECT_MODEL=your-strong-planning-model
-WORKER_MODEL=your-cheaper-tool-capable-model
-AI_REQUEST_TIMEOUT=120
-```
+1. When you can access the VPS, create an SSH tunnel: `ssh -L 3001:127.0.0.1:3001 <vps-user>@<vps-host>`. Keep that terminal/session open and visit `http://127.0.0.1:3001` on the same device.
+2. Complete FreeLLMAPI first-run setup. If it asks for a setup code, retrieve it on the VPS with `cd ~/Agentic-AI && docker compose logs freellmapi`. Keep the dashboard credentials private.
+3. Add provider API keys for providers whose free tiers you want to use. FreeLLMAPI is open-source/free software, but upstream provider quotas and terms apply.
+4. Copy the unified API key from the dashboard. Put it in the VPS's private `~/Agentic-AI/.env` as `FREELLMAPI_API_KEY=...`. Then run `cd ~/Agentic-AI && docker compose up -d --force-recreate agent`.
+5. Start with `auto` model selection. Check the live catalogue at `http://127.0.0.1:3001/v1/models` through the tunnel and choose exact model IDs for `ARCHITECT_MODEL` and `WORKER_MODEL` after verifying tool/function-calling support. Put those IDs in the VPS .env and recreate the agent.
 
-For FreeLLMAPI or another OpenAI-compatible gateway, set `AI_BASE_URL` to its **chat-completions endpoint** and `AI_API_KEY` to its access key. If `AI_API_KEY` is empty, `OPENROUTER_API_KEY` is used for backwards compatibility. Model IDs must be exposed by the configured gateway. The worker model must support tool/function calling.
-
-Each task gets an architect planning call, a worker tool loop, and an architect review call. If planning fails, the worker can still proceed and the error is reported. If review fails, the result is explicitly marked as not independently reviewed. Using the same model for both roles is compatible but does not provide true model diversity.
+The agent container overrides `OPENROUTER_API_KEY` with an empty value, so it will not silently fall back to a paid OpenRouter route. Until `FREELLMAPI_API_KEY` is configured and FreeLLMAPI has usable provider keys/models, agent model calls will fail rather than incur API charges. FreeLLMAPI routes/fails over only among providers and models configured in its dashboard; verify that each selected upstream is genuinely free before using it.
 
 ## Safety model
 
@@ -35,6 +30,8 @@ Read operations are available automatically. State-changing operations require a
 Container restarts also require approval. The generic shell is allowlisted and read-only. Docker and Git use dedicated tools. Sensitive files are blocked or redacted. Verification commands are bounded and project-aware.
 
 ## VPS setup
+
+The deployment workflow updates the existing checkout and runs Python syntax checks and unit tests before starting the stack. For a manual agent-only install:
 
 ```bash
 git clone https://github.com/wroxtaaar/Agentic-AI.git
@@ -47,7 +44,7 @@ nano .env
 python -m uvicorn app:app --host 127.0.0.1 --port 8787
 ```
 
-Use Tailscale or another private network for access. Do not expose the raw control API publicly.
+Use Tailscale or another private network for agent access. Do not expose the raw control API publicly.
 
 ## API
 
@@ -59,9 +56,9 @@ Use Tailscale or another private network for access. Do not expose the raw contr
 - POST /api/approvals/{id}/reject
 - POST /api/proposals/{id}/approve
 - POST /api/proposals/{id}/apply
-- POST /api/actions/{id}/execute — executes any approved supported action
-- POST /api/actions/docker/{id}/execute — backward-compatible Docker executor
-- POST /api/actions/restart-container — legacy restart proposal endpoint
+- POST /api/actions/{id}/execute
+- POST /api/actions/docker/{id}/execute
+- POST /api/actions/restart-container
 
 ## Example tasks
 
@@ -70,10 +67,8 @@ Use Tailscale or another private network for access. Do not expose the raw contr
 - Fix the crash in FinanceSMSTracker and prepare a patch.
 - Check Docker containers and find anything using too much memory.
 
-The agent investigates first, presents evidence, and requires approval before mutations. For coding tasks, it can create a detached worktree under `AGENT_CODING_WORKSPACE_ROOT`, edit and test there, and retry failed checks for up to three edit/verify cycles. It refuses to start if the source checkout has uncommitted changes. After successful verification, `coding_finalize` produces a diff and a pending `workspace_patch` approval. Approving and executing that item applies the patch to the original checkout and reruns verification; a failed post-apply check triggers a reverse-patch rollback attempt. This does not commit or push. Review the resulting Git diff, then request a separate approval-gated commit; the existing GitHub Actions workflow deploys after a push to `main`. Docker start/restart/stop, Git commits, durable memory writes, and exact source patches are approval-gated. Approved Docker actions are verified after execution. The control plane is intended to remain private behind Tailscale or another trusted network.
+The agent investigates first, presents evidence, and requires approval before mutations. For coding tasks, it creates a detached worktree, edits and tests there, retries failed checks for up to three edit/verify cycles, then produces a diff for approval. Applying the diff requires approval and reruns verification; a failed post-apply check triggers a reverse-patch rollback attempt. This does not commit or push. Docker start/restart/stop, Git commits, durable memory writes, and exact source patches are approval-gated.
 
 ## Continuous VPS monitoring (optional)
 
-The monitoring worker checks Docker container status/health, resource thresholds, bounded recent error-log excerpts, HTTP health checks, incident deduplication, and email alerts on incident/recovery transitions.
-
-See [monitoring/README.md](monitoring/README.md). Keep SMTP credentials in a private `.env.monitor`; never commit secrets. The monitor uses a private Docker socket proxy configured for GET-only API requests and does not perform restarts or deployments. The private agent API provides authenticated read-only diagnostics for allowlisted containers.
+The monitoring worker checks Docker container status/health, resource thresholds, bounded recent error-log excerpts, HTTP health checks, incident deduplication, and email alerts on incident/recovery transitions. See [monitoring/README.md](monitoring/README.md). Keep SMTP credentials in a private .env.monitor; never commit secrets. The monitor uses a private Docker socket proxy configured for GET-only API requests and does not perform restarts or deployments.
