@@ -93,6 +93,22 @@ class ModelRoutingTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "AI gateway returned no assistant message"):
                 agent._request("auto", [{"role": "user", "content": "hello"}])
 
+    def test_tool_calls_reject_malformed_entries(self):
+        calls, invalid = Orchestrator._valid_tool_calls([
+            {"id": "good", "function": {"name": "read_file", "arguments": '{"path":"README.md"}'}},
+            None,
+            {"function": "not-an-object"},
+            {"function": {"name": "", "arguments": "{}"}},
+            {"function": {"name": "read_file", "arguments": {}}},
+        ])
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(invalid, 4)
+
+    def test_tool_calls_reject_non_list_payload(self):
+        calls, invalid = Orchestrator._valid_tool_calls({"function": {"name": "read_file"}})
+        self.assertEqual(calls, [])
+        self.assertEqual(invalid, 1)
+
     def test_tool_arguments_reject_invalid_json(self):
         args, error = Orchestrator._parse_tool_arguments("{not-json")
         self.assertIsNone(args)
