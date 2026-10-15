@@ -4,23 +4,35 @@ A self-hosted multi-agent engineering control plane for managing software projec
 
 ## Agent team
 
-- **Orchestrator** — routes requests to the right specialist and coordinates multi-step work.
-- **Project Agent** — discovers repositories and project structure.
-- **Coding Agent** — diagnoses source problems and creates exact approval-gated patches.
-- **DevOps Agent** — investigates Docker, services and resource state.
-- **Git Agent** — reads branches, commits, history and diffs.
-- **Debugger Agent** — correlates logs, source and configuration.
-- **Security Agent** — reviews proposed operations for secrets and unsafe scope.
-- **Verification Agent** — runs post-change checks.
-- **Memory Agent** — stores durable non-secret project facts.
+- **Architect** — plans work before execution and reviews the worker's report afterward.
+- **Worker/orchestrator** — uses repository and VPS tools to investigate and produce exact patch proposals.
+- **Specialists** — project discovery, coding, DevOps, Git, debugging, security, verification and memory.
+- **Verification** — runs bounded project-aware syntax, test and build checks.
 
-Specialists are routed by the orchestrator and operate through a shared, approval-aware tool layer. Read-only investigation is automatic; mutations are represented as durable approval records and executed only after explicit approval. Docker actions include post-action verification.
+The architect and worker can use different model IDs behind any compatible OpenAI Chat Completions gateway. The gateway supplies model access; repository tools, shell execution, tests and approval handling remain on the VPS.
+
+## Model configuration
+
+Legacy deployments continue to work with `OPENROUTER_API_KEY` and `OPENROUTER_MODEL`. Configure these optional variables in the private VPS `.env`:
+
+```env
+AI_BASE_URL=https://openrouter.ai/api/v1/chat/completions
+AI_API_KEY=
+OPENROUTER_API_KEY=...
+ARCHITECT_MODEL=your-strong-planning-model
+WORKER_MODEL=your-cheaper-tool-capable-model
+AI_REQUEST_TIMEOUT=120
+```
+
+For FreeLLMAPI or another OpenAI-compatible gateway, set `AI_BASE_URL` to its **chat-completions endpoint** and `AI_API_KEY` to its access key. If `AI_API_KEY` is empty, `OPENROUTER_API_KEY` is used for backwards compatibility. Model IDs must be exposed by the configured gateway. The worker model must support tool/function calling.
+
+Each task gets an architect planning call, a worker tool loop, and an architect review call. If planning fails, the worker can still proceed and the error is reported. If review fails, the result is explicitly marked as not independently reviewed. Using the same model for both roles is compatible but does not provide true model diversity.
 
 ## Safety model
 
 Read operations are available automatically. State-changing operations require an approval record. Source patches record exact old_text, new_text, target paths and SHA-256 snapshots. Applying a patch requires the snapshot to still match and creates a backup first.
 
-Container restarts also require approval. The generic shell is allowlisted and read-only. Docker and Git use dedicated tools. Sensitive files are blocked or redacted.
+Container restarts also require approval. The generic shell is allowlisted and read-only. Docker and Git use dedicated tools. Sensitive files are blocked or redacted. Verification commands are bounded and project-aware.
 
 ## VPS setup
 
@@ -33,16 +45,6 @@ pip install -r requirements.txt
 cp .env.example .env
 nano .env
 python -m uvicorn app:app --host 127.0.0.1 --port 8787
-```
-
-Recommended .env values:
-
-```env
-AI_PROVIDER=openrouter
-OPENROUTER_API_KEY=...
-OPENROUTER_MODEL=openrouter/free
-AGENT_API_TOKEN=generate-a-long-random-token
-AGENT_WORKSPACE_ROOTS=/home/ubuntu
 ```
 
 Use Tailscale or another private network for access. Do not expose the raw control API publicly.
@@ -70,11 +72,8 @@ Use Tailscale or another private network for access. Do not expose the raw contr
 
 The agent investigates first, presents evidence, and requires approval before mutations. Docker start/restart/stop, Git commits, durable memory writes, and exact source patches are approval-gated. Approved Docker actions are verified after execution. The control plane is intended to remain private behind Tailscale or another trusted network.
 
-
 ## Continuous VPS monitoring (optional)
 
-The monitoring branch adds a separate read-only worker for Docker container status/health, per-container CPU and memory thresholds, bounded recent error-log excerpts, HTTP health checks, incident deduplication, and email alerts on incident/recovery transitions.
+The monitoring worker checks Docker container status/health, resource thresholds, bounded recent error-log excerpts, HTTP health checks, incident deduplication, and email alerts on incident/recovery transitions.
 
-See [monitoring/README.md](monitoring/README.md) for the security model and setup. Before enabling the monitor, create a private `.env.monitor` on the VPS from `.env.monitor.example`; SMTP credentials must never be committed. The monitor uses a private Docker socket proxy configured for GET-only API requests and does not perform restarts or deployments.
-
-The monitor checks container-level resource use, not host root-disk free space or total host memory. The private agent API also provides authenticated read-only diagnostics endpoints for allowlisted container status, CPU/memory snapshots, and bounded redacted logs. See [monitoring/DIAGNOSTICS_API.md](monitoring/DIAGNOSTICS_API.md). This is not a native ChatGPT connector: use a private SSH tunnel to retrieve diagnostics and share the resulting JSON for analysis. Do not expose the control API publicly.
+See [monitoring/README.md](monitoring/README.md). Keep SMTP credentials in a private `.env.monitor`; never commit secrets. The monitor uses a private Docker socket proxy configured for GET-only API requests and does not perform restarts or deployments. The private agent API provides authenticated read-only diagnostics for allowlisted containers.
