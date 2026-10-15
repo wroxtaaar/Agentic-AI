@@ -7,7 +7,10 @@ from core.orchestrator import Orchestrator
 
 class ModelRoutingTests(unittest.TestCase):
     def test_legacy_model_is_default_for_both_roles(self):
-        env = {"OPENROUTER_MODEL": "legacy/model", "OPENROUTER_API_KEY": "test-key"}
+        env = {
+            "OPENROUTER_MODEL": "legacy/model", "OPENROUTER_API_KEY": "test-key",
+            "AI_BASE_URL": "https://openrouter.ai/api/v1/chat/completions",
+        }
         with patch.dict(os.environ, env, clear=False):
             with patch.dict(os.environ, {"ARCHITECT_MODEL": "", "WORKER_MODEL": ""}, clear=False):
                 agent = Orchestrator()
