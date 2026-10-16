@@ -293,7 +293,7 @@ class Orchestrator:
                                if not result.get("success") and (result.get("error") or result.get("stderr")) else {}),
                         })
                         messages.append({
-                            "role": "tool", "tool_call_id": call.get("id", ""),
+                            "role": "tool", "tool_call_id": call["id"],
                             "content": json.dumps(result, default=str)[:6000],
                         })
                 else:
@@ -429,7 +429,7 @@ class Orchestrator:
                 if args_error:
                     trace.append({"tool": name, "success": False, "error": args_error})
                     messages.append({
-                        "role": "tool", "tool_call_id": call.get("id", ""),
+                        "role": "tool", "tool_call_id": call["id"],
                         "content": json.dumps({"success": False, "error": args_error}),
                     })
                     continue
@@ -462,7 +462,7 @@ class Orchestrator:
                         trace_item["return_code"] = result["return_code"]
                 trace.append(trace_item)
                 messages.append({
-                    "role": "tool", "tool_call_id": call.get("id", ""),
+                    "role": "tool", "tool_call_id": call["id"],
                     "content": json.dumps(result, default=str)[:8000],
                 })
         return {
