@@ -131,6 +131,9 @@ class ModelRoutingTests(unittest.TestCase):
 
     def test_gateway_rejects_non_string_assistant_content(self):
         agent = Orchestrator.__new__(Orchestrator)
+        agent.api_key = "test-key"
+        agent.base_url = "http://freellmapi:3001/v1/chat/completions"
+        agent.timeout = 10
         response = Mock()
         response.json.return_value = {"choices": [{"message": {"content": {"unexpected": "object"}}}]}
         with patch("core.orchestrator.httpx.post", return_value=response):
