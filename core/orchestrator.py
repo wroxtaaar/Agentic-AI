@@ -185,7 +185,11 @@ class Orchestrator:
         first_choice = choices[0]
         if not isinstance(first_choice, dict) or not isinstance(first_choice.get("message"), dict):
             raise RuntimeError("AI gateway returned no assistant message")
-        return first_choice["message"]
+        message = first_choice["message"]
+        content = message.get("content")
+        if content is not None and not isinstance(content, str):
+            raise RuntimeError("AI gateway returned malformed assistant content")
+        return message
 
     def _architect_plan(self, user, history, specialists):
         messages = [

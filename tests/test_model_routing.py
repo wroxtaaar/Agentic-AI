@@ -129,6 +129,25 @@ class ModelRoutingTests(unittest.TestCase):
                 self.assertEqual(calls, [])
                 self.assertEqual(invalid, 1)
 
+    def test_gateway_rejects_non_string_assistant_content(self):
+        agent = Orchestrator.__new__(Orchestrator)
+        response = Mock()
+        response.json.return_value = {"choices": [{"message": {"content": {"unexpected": "object"}}}]}
+        with patch("core.orchestrator.httpx.post", return_value=response):
+            with self.assertRaisesRegex(RuntimeError, "malformed assistant content"):
+                agent._request("test-model", [{"role": "user", "content": "hello"}])
+
+    def test_gateway_accepts_null_assistant_content_for_tool_calls(self):
+        agent = Orchestrator.__new__(Orchestrator)
+        agent.api_key = "test-key"
+        agent.base_url = "http://freellmapi:3001/v1/chat/completions"
+        agent.timeout = 10
+        response = Mock()
+        response.json.return_value = {"choices": [{"message": {"content": None, "tool_calls": []}}]}
+        with patch("core.orchestrator.httpx.post", return_value=response):
+            message = agent._request("test-model", [{"role": "user", "content": "hello"}])
+        self.assertIsNone(message["content"])
+
     def test_tool_result_requires_object(self):
         for raw in (None, [], "ok", 1):
             with self.subTest(raw=raw):
