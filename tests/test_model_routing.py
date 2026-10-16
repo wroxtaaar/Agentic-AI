@@ -93,6 +93,39 @@ class ModelRoutingTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "AI gateway returned no assistant message"):
                 agent._request("auto", [{"role": "user", "content": "hello"}])
 
+    def test_gateway_rejects_empty_choices(self):
+        agent = Orchestrator.__new__(Orchestrator)
+        agent.api_key = "test-key"
+        agent.base_url = "http://freellmapi:3001/v1/chat/completions"
+        agent.timeout = 10
+        response = Mock()
+        response.json.return_value = {"choices": []}
+        with patch("core.orchestrator.httpx.post", return_value=response):
+            with self.assertRaisesRegex(RuntimeError, "AI gateway returned no assistant message"):
+                agent._request("test-model", [{"role": "user", "content": "hello"}])
+
+    def test_gateway_rejects_missing_choices(self):
+        agent = Orchestrator.__new__(Orchestrator)
+        agent.api_key = "test-key"
+        agent.base_url = "http://freellmapi:3001/v1/chat/completions"
+        agent.timeout = 10
+        response = Mock()
+        response.json.return_value = {"id": "response-without-choices"}
+        with patch("core.orchestrator.httpx.post", return_value=response):
+            with self.assertRaisesRegex(RuntimeError, "AI gateway returned no assistant message"):
+                agent._request("test-model", [{"role": "user", "content": "hello"}])
+
+    def test_gateway_rejects_missing_message_object(self):
+        agent = Orchestrator.__new__(Orchestrator)
+        agent.api_key = "test-key"
+        agent.base_url = "http://freellmapi:3001/v1/chat/completions"
+        agent.timeout = 10
+        response = Mock()
+        response.json.return_value = {"choices": [{"finish_reason": "stop"}]}
+        with patch("core.orchestrator.httpx.post", return_value=response):
+            with self.assertRaisesRegex(RuntimeError, "AI gateway returned no assistant message"):
+                agent._request("test-model", [{"role": "user", "content": "hello"}])
+
     def test_valid_tool_calls_always_have_nonempty_ids(self):
         for raw in (
             [{"id": "", "function": {"name": "read_file", "arguments": "{}"}}],
