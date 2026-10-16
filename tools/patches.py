@@ -1,4 +1,4 @@
-import hashlib,json,os,secrets
+import hashlib,json,os,secrets,re
 from pathlib import Path
 from .safety import sensitive,within
 from core.approvals import create,get
@@ -49,11 +49,18 @@ def propose(project,problem,explanation,edits):
     (PROPOSALS/f'{pid}.json').write_text(json.dumps(proposal,indent=2),encoding='utf-8')
     return {'success':True,'proposal':proposal,'approval':approval}
 
+def _valid_proposal_id(pid):
+    return isinstance(pid, str) and re.fullmatch(r"[a-f0-9]{16}", pid) is not None
+
 def load(pid):
+    if not _valid_proposal_id(pid):
+        return None
     f=PROPOSALS/f'{pid}.json'
-    return json.loads(f.read_text()) if f.exists() else None
+    return json.loads(f.read_text(encoding="utf-8")) if f.is_file() else None
 
 def save(p):
+    if not isinstance(p, dict) or not _valid_proposal_id(p.get("id")):
+        raise ValueError("Invalid proposal ID")
     (PROPOSALS/f"{p['id']}.json").write_text(json.dumps(p,indent=2),encoding='utf-8')
 
 def approve(pid):
