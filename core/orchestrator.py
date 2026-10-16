@@ -274,7 +274,7 @@ class Orchestrator:
                         if failed_tools:
                             report["success"] = False
                             report["report"] += (
-                                "\\n\\nVerification status: INCOMPLETE. One or more tool calls failed; "
+                                "\n\nVerification status: INCOMPLETE. One or more tool calls failed; "
                                 "do not treat this specialist report as a successful verification. "
                                 "Failed tools: " + ", ".join(
                                     f"{item.get('tool', 'unknown')} ({item.get('error', 'failure')})"
@@ -443,8 +443,8 @@ class Orchestrator:
                     )
                     worker_answer = (
                         "VERIFICATION WARNING: One or more tool-backed checks failed or specialist "
-                        "investigations were incomplete. The task must not be considered fully verified.\\n\\n"
-                        "Failures: " + "; ".join(failures[:12]) + "\\n\\n" + worker_answer
+                        "investigations were incomplete. The task must not be considered fully verified.\n\n"
+                        "Failures: " + "; ".join(failures[:12]) + "\n\n" + worker_answer
                     )
                 return {
                     "success": not failed_tools and not failed_specialists, "answer": worker_answer, "architect_plan": plan,
