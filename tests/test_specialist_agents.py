@@ -62,7 +62,8 @@ class SpecialistAgentTests(unittest.TestCase):
         with patch.object(self.agent, "_request", side_effect=responses):
             reports = self.agent._specialist_investigations("Check Git", "Inspect status", ["git"])
         self.assertEqual(calls, [])
-        self.assertTrue(reports[0]["success"])
+        self.assertFalse(reports[0]["success"])
+        self.assertIn("INCOMPLETE", reports[0]["report"])
         self.assertFalse(reports[0]["tool_trace"][0]["success"])
         self.assertIn("non-empty JSON object", reports[0]["tool_trace"][0]["error"])
 
