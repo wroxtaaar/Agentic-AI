@@ -184,6 +184,36 @@ class ModelRoutingTests(unittest.TestCase):
             message = agent._request("test-model", [{"role": "user", "content": "hello"}])
         self.assertIsNone(message["content"])
 
+    def test_specialist_tool_requires_both_allowlists_and_registration(self):
+        allowed = {"read_file", "coding_write_file"}
+        readonly = {"read_file"}
+        registered = {"read_file": {}, "coding_write_file": {}}
+        self.assertTrue(Orchestrator._specialist_tool_is_allowed(
+            "read_file", allowed, readonly, registered
+        ))
+        self.assertFalse(Orchestrator._specialist_tool_is_allowed(
+            "coding_write_file", allowed, readonly, registered
+        ))
+        self.assertFalse(Orchestrator._specialist_tool_is_allowed(
+            "read_file", allowed, readonly, {}
+        ))
+        self.assertFalse(Orchestrator._specialist_tool_is_allowed(
+            "unknown", allowed, readonly, registered
+        ))
+
+    def test_blank_worker_response_is_not_usable(self):
+        for report in ("", "   ", "\\n\\t"):
+            with self.subTest(report=repr(report)):
+                self.assertFalse(Orchestrator._worker_response_is_usable(report))
+        self.assertTrue(Orchestrator._worker_response_is_usable("Verified findings"))
+
+    def test_blank_specialist_report_is_marked_unavailable(self):
+        report = Orchestrator._build_specialist_report("qa", "  ", [], 0)
+        self.assertFalse(report["success"])
+        self.assertEqual(report["agent"], "qa")
+        self.assertIn("unavailable", report["report"])
+        self.assertEqual(report["tool_trace"], [])
+
     def test_tool_result_requires_object(self):
         for raw in (None, [], "ok", 1):
             with self.subTest(raw=raw):
