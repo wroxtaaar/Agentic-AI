@@ -202,7 +202,7 @@ class ModelRoutingTests(unittest.TestCase):
         ))
 
     def test_blank_worker_response_is_not_usable(self):
-        for report in ("", "   ", "\\n\\t"):
+        for report in ("", "   ", "\n\t"):
             with self.subTest(report=repr(report)):
                 self.assertFalse(Orchestrator._worker_response_is_usable(report))
         self.assertTrue(Orchestrator._worker_response_is_usable("Verified findings"))
