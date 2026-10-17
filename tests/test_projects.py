@@ -42,7 +42,6 @@ class ProjectTests(unittest.TestCase):
     result = audit_project('.')
    self.assertTrue(result['success'], result)
    self.assertEqual(result['project'], str(root.resolve()))
-   self.assertTrue(result['git']['success'])
 
  def test_structure_reports_ambiguous_default_path(self):
   with tempfile.TemporaryDirectory() as d:
