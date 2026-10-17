@@ -3,7 +3,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from .projects import roots
+from .projects import roots, resolve_project_path
 from .safety import redact
 
 IGNORE={'.git','.venv','venv','node_modules','build','dist','.gradle','__pycache__'}
@@ -23,8 +23,8 @@ def python_syntax(path):
             'stdout':redact(r.stdout),'stderr':redact(r.stderr),'return_code':r.returncode}
 
 def project_markers(path):
-    root=Path(path).expanduser().resolve()
-    if not _allowed(root): return {'success':False,'error':'Project is outside configured workspace'}
+    root, error = resolve_project_path(path)
+    if error: return {'success':False,'error':error}
     markers=[]
     if any((root/x).exists() for x in ('pyproject.toml','requirements.txt','setup.py')): markers.append('python')
     if (root/'package.json').exists(): markers.append('node')
