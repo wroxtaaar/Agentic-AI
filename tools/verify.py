@@ -44,9 +44,8 @@ def _run(root, command, timeout):
         return {'success':False,'command':' '.join(command),'error':str(exc)}
 
 def project_verify(path, mode='auto', timeout=180):
-    root=Path(path).expanduser().resolve()
-    if not root.is_dir(): return {'success':False,'error':'Project directory not found'}
-    if not _allowed(root): return {'success':False,'error':'Project is outside configured workspace'}
+    root, error = resolve_project_path(path)
+    if error: return {'success':False,'error':error}
     timeout=max(10,min(int(timeout),600))
     if mode not in {'auto','syntax','test','build'}:
         return {'success':False,'error':'Unsupported verification mode'}
