@@ -14,6 +14,26 @@ def _inside_workspace(path):
         return False
     return any(p == root or root in p.parents for root in roots())
 
+def resolve_project_path(path):
+    """Resolve an omitted/current-directory project to one unambiguous discovered repository."""
+    if path is None or str(path).strip() in {"", ".", "./"}:
+        result = discover(limit=200, max_depth=4)
+        projects = result.get("projects", []) if result.get("success") else []
+        named = [item for item in projects if Path(item["path"]).name.lower() == "agentic-ai"]
+        candidates = named if len(named) == 1 else projects
+        if len(candidates) == 1:
+            return Path(candidates[0]["path"]).resolve(), None
+        if not candidates:
+            return None, "No Git repository found under configured workspace roots; run discover_projects and pass an exact path."
+        return None, "Multiple projects found under configured workspace roots; run discover_projects and pass an exact path."
+    candidate = Path(path).expanduser().resolve()
+    if not _inside_workspace(candidate):
+        return None, "Project is outside configured workspace"
+    if not candidate.is_dir():
+        return None, "Project directory not found"
+    return candidate, None
+
+
 def discover(limit=100,max_depth=4):
     found=[]
     for root in roots():
@@ -49,8 +69,8 @@ def read_files(paths):
     return {'success':all(x.get('success') for x in results),'files':results}
 
 def structure(path):
-    p=Path(path).expanduser().resolve()
-    if not _inside_workspace(p):return {'success':False,'error':'Project is outside configured workspace'}
+    p, error = resolve_project_path(path)
+    if error:return {'success':False,'error':error}
     important=[]; count=0
     for x in p.rglob('*'):
         if any(part in IGNORE for part in x.relative_to(p).parts):continue
