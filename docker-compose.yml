@@ -10,6 +10,7 @@ services:
     environment:
       AGENT_WORKSPACE_ROOTS: /home/ubuntu
       DIAGNOSTICS_MAX_LOG_LINES: "200"
+      DIAGNOSTICS_CONTAINERS: home,docker-control-bot,agentic-ai,agentic-monitor,freellmapi
       AI_BASE_URL: http://freellmapi:3001/v1/chat/completions
       AI_API_KEY: ${FREELLMAPI_API_KEY:-}
       OPENROUTER_API_KEY: ""
