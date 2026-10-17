@@ -2,7 +2,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from .projects import roots, IGNORE
+from .projects import roots, IGNORE, resolve_project_path
 from .safety import redact, sensitive
 
 
@@ -56,10 +56,10 @@ def _finding(kind, severity, confidence, title, evidence, detail=None):
 
 
 def audit_project(path):
-    root = Path(path).expanduser().resolve()
-    if not root.is_dir():
-        return {"success": False, "error": "Project directory not found"}
-    if sensitive(root) or not _inside_workspace(root):
+    root, error = resolve_project_path(path)
+    if error:
+        return {"success": False, "error": error}
+    if sensitive(root):
         return {"success": False, "error": "Project is outside the configured workspace"}
 
     marker_map = {
