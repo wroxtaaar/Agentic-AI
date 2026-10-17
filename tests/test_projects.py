@@ -2,6 +2,7 @@ import tempfile, unittest
 from pathlib import Path
 from unittest.mock import patch
 from tools.projects import structure, resolve_project_path
+from tools.audit import audit_project
 
 class ProjectTests(unittest.TestCase):
  def test_structure(self):
@@ -29,5 +30,28 @@ class ProjectTests(unittest.TestCase):
     resolved, error = resolve_project_path('.')
    self.assertIsNone(resolved)
    self.assertIn('Multiple projects', error)
+
+
+ def test_audit_resolves_default_project_path(self):
+  with tempfile.TemporaryDirectory() as d:
+   root=Path(d)/'Agentic-AI'
+   root.mkdir()
+   (root/'.git').mkdir()
+   (root/'README.md').write_text('safe test fixture')
+   with patch('tools.projects.roots', return_value=[Path(d)]):
+    result = audit_project('.')
+   self.assertTrue(result['success'], result)
+   self.assertEqual(result['project'], str(root.resolve()))
+   self.assertTrue(result['git']['success'])
+
+ def test_structure_reports_ambiguous_default_path(self):
+  with tempfile.TemporaryDirectory() as d:
+   parent=Path(d)
+   for name in ('one','two'):
+    (parent/name/'.git').mkdir(parents=True)
+   with patch('tools.projects.roots', return_value=[parent]):
+    result = structure('.')
+   self.assertFalse(result['success'])
+   self.assertIn('Multiple projects', result['error'])
 
 if __name__=='__main__':unittest.main()
