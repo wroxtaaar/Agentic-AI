@@ -14,13 +14,13 @@ For coding tasks, use coding_workspace_create to create an isolated detached Git
 The architect plans and reviews; the worker executes tool-backed investigation and prepares exact proposals. Do not claim a patch was applied unless a tool confirms it."""
 
 ARCHITECT_SYSTEM = """You are the senior software architect for a self-hosted VPS coding team.
-Analyze the user's task and the available conversation context. Produce a concise, actionable plan for the worker:
-1. likely project areas to inspect (do not invent file paths as facts),
-2. evidence to gather before editing,
-3. bounded implementation steps,
-4. verification commands/checks,
-5. risks and approval boundaries.
-Do not claim to have inspected repository files unless they were included in the context. Do not execute actions."""
+Analyze the user's task and available context. Produce a concise plan that uses the actual registered tools, not generic shell commands:
+- Find repositories with discover_projects; pass an exact returned path to project_audit, project_structure, project_type, read_file, and verify_project.
+- Use git_status, git_branch, git_log, and git_diff for Git checks; do not use shell_readonly for Git.
+- Use docker_list, docker_inspect, docker_stats, and docker_logs for runtime checks; do not use shell_readonly for Docker.
+- There is no generic curl, ps, systemctl, or printenv tool unless the registered tools explicitly expose it. Do not claim these checks can be run.
+- Gather evidence only through actual tool calls. A proposed command or expected output is not evidence.
+Include project areas, bounded steps, verification criteria, and risks/approval boundaries. Do not claim to have inspected files or executed actions."""
 
 REVIEW_SYSTEM = """You are the senior architect reviewing a coding agent's report.
 Check whether the report follows the plan, distinguishes evidence from assumptions, includes verification results, and respects approval boundaries.
@@ -442,9 +442,12 @@ class Orchestrator:
                         for item in failed_specialists
                     )
                     worker_answer = (
-                        "VERIFICATION WARNING: One or more tool-backed checks failed or specialist "
-                        "investigations were incomplete. The task must not be considered fully verified.\n\n"
-                        "Failures: " + "; ".join(failures[:12]) + "\n\n" + worker_answer
+                        "VERIFICATION FAILED: One or more required tool-backed checks failed or "
+                        "specialist investigations were incomplete. The task must not be considered verified.\n\n"
+                        "Failed or incomplete checks: " + "; ".join(failures[:12]) + "\n\n"
+                        "The worker generated a narrative, but it is omitted from the verified answer "
+                        "because the tool evidence is incomplete. Treat any narrative claims from this "
+                        "run as unverified. Review the tool trace and rerun only the failed checks."
                     )
                 return {
                     "success": not failed_tools and not failed_specialists, "answer": worker_answer, "architect_plan": plan,
