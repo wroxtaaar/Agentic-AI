@@ -13,7 +13,7 @@ class ProjectVerificationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "package.json").write_text('{"name":"demo","scripts":{"test":"echo ok"}}')
-            with patch("tools.verify.roots", return_value=[root]):
+            with patch("tools.verify.roots", return_value=[root]), patch("tools.projects.roots", return_value=[root]):
                 result = project_markers(str(root))
             self.assertEqual(result["project_type"], "node")
 
@@ -22,7 +22,7 @@ class ProjectVerificationTests(unittest.TestCase):
             root = Path(tmp)
             (root / ".git").mkdir()
             (root / "build.gradle.kts").write_text("plugins {}")
-            with patch("tools.audit.roots", return_value=[root]):
+            with patch("tools.audit.roots", return_value=[root]), patch("tools.projects.roots", return_value=[root]):
                 result = audit_project(str(root))
             self.assertTrue(result["success"])
             self.assertIn("git", result)
