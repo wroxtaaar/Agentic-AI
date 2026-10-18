@@ -1,7 +1,9 @@
+.env
+.env.monitor
+.venv/
 __pycache__/
 *.pyc
-.venv/
-*.egg-info/
-.env
-config/config.yaml
-data/
+*.db
+*.log
+backups/
+.pytest_cache/

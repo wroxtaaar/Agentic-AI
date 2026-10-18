@@ -1,0 +1,139 @@
+import hashlib,json,os,secrets,re
+from pathlib import Path
+from .safety import sensitive,within
+from core.approvals import create,get
+from tools.projects import roots
+
+ROOT=Path(__file__).resolve().parent.parent
+PROPOSALS=Path(os.getenv('AGENT_PROPOSALS_DIR','/data/proposals'))
+PROPOSALS.mkdir(parents=True,exist_ok=True)
+
+def sha(p): return hashlib.sha256(p.read_bytes()).hexdigest()
+
+def _allowed_project(root):
+    return any(root == base or base in root.parents for base in roots())
+
+def _safe_target(root, file):
+    """Resolve a proposal path and fail closed on traversal, symlinks outside root, or secrets."""
+    if not isinstance(file, str) or not file:
+        return None
+    relative = Path(file)
+    if relative.is_absolute() or ".." in relative.parts:
+        return None
+    target = (root / relative).resolve()
+    if not within(target, root) or sensitive(target):
+        return None
+    return target
+
+def propose(project,problem,explanation,edits):
+    root=Path(project).expanduser().resolve()
+    if not root.is_dir(): return {'success':False,'error':'Project not found'}
+    if not _allowed_project(root): return {'success':False,'error':'Project is outside configured workspace'}
+    if not isinstance(edits,list) or not edits: return {'success':False,'error':'At least one exact edit required'}
+    if len(edits)>20: return {'success':False,'error':'Too many edits in one proposal'}
+    normalized=[]; hashes={}
+    for e in edits:
+        if not isinstance(e, dict): return {'success':False,'error':'Invalid edit'}
+        f,old,new=e.get('file'),e.get('old_text'),e.get('new_text')
+        if not all(isinstance(x,str) for x in (f,old,new)): return {'success':False,'error':'Invalid edit'}
+        target=_safe_target(root,f)
+        if target is None or not target.is_file():
+            return {'success':False,'error':f'Invalid target: {f}'}
+        content=target.read_text(encoding='utf-8',errors='replace')
+        if content.count(old)!=1: return {'success':False,'error':f'old_text must occur exactly once: {f}'}
+        hashes[f]=sha(target)
+        normalized.append({'file':f,'old_text':old,'new_text':new})
+    pid=secrets.token_hex(8)
+    approval=create('code_patch',f'Apply coding proposal {pid}',{'proposal_id':pid})
+    proposal={'id':pid,'project':str(root),'problem':problem,'explanation':explanation,'edits':normalized,'hashes':hashes,'status':'pending','approval_id':approval['id']}
+    (PROPOSALS/f'{pid}.json').write_text(json.dumps(proposal,indent=2),encoding='utf-8')
+    return {'success':True,'proposal':proposal,'approval':approval}
+
+def _valid_proposal_id(pid):
+    return isinstance(pid, str) and re.fullmatch(r"[a-f0-9]{16}", pid) is not None
+
+def load(pid):
+    if not _valid_proposal_id(pid):
+        return None
+    f=PROPOSALS/f'{pid}.json'
+    return json.loads(f.read_text(encoding="utf-8")) if f.is_file() else None
+
+def save(p):
+    if not isinstance(p, dict) or not _valid_proposal_id(p.get("id")):
+        raise ValueError("Invalid proposal ID")
+    (PROPOSALS/f"{p['id']}.json").write_text(json.dumps(p,indent=2),encoding='utf-8')
+
+def approve(pid):
+    p=load(pid)
+    if not p: return {'success':False,'error':'Proposal not found'}
+    approval=get(p.get('approval_id',''))
+    if not approval: return {'success':False,'error':'Approval record not found'}
+    if approval.get('status')!='approved': return {'success':False,'error':'Approval must be approved through the approval queue first'}
+    p['status']='approved'; save(p); return p
+
+def apply(pid):
+    p=load(pid)
+    if not p or p.get('status')!='approved': return {'success':False,'error':'Proposal is not approved'}
+    approval=get(p.get('approval_id',''))
+    if not approval or approval.get('status')!='approved': return {'success':False,'error':'Approval record is not approved'}
+    root=Path(p.get('project','')).expanduser().resolve()
+    if not root.is_dir() or not _allowed_project(root):
+        return {'success':False,'error':'Project is outside configured workspace'}
+    if not isinstance(p.get('edits'),list) or not p['edits'] or len(p['edits'])>20:
+        return {'success':False,'error':'Invalid proposal edit list'}
+    for e in p['edits']:
+        if not isinstance(e,dict) or not isinstance(e.get('file'),str):
+            return {'success':False,'error':'Invalid proposal edit'}
+        target=_safe_target(root,e['file'])
+        if target is None or not target.is_file(): return {'success':False,'error':f'Invalid or missing target: {e["file"]}'}
+        if not isinstance(p.get('hashes'),dict) or e['file'] not in p['hashes'] or sha(target)!=p['hashes'][e['file']]:
+            return {'success':False,'error':f'Changed since proposal: {e["file"]}'}
+    backups=[]
+    try:
+        for e in p['edits']:
+            target=_safe_target(root,e['file'])
+            if target is None or not target.is_file():
+                raise ValueError(f'Invalid target during apply: {e["file"]}')
+            content=target.read_text(encoding='utf-8')
+            backup=target.with_name(target.name+'.backup-'+secrets.token_hex(4))
+            backup.write_text(content,encoding='utf-8')
+            backups.append(str(backup))
+            target.write_text(content.replace(e['old_text'],e['new_text']),encoding='utf-8')
+    except Exception as exc:
+        for e,backup in zip(p['edits'],backups):
+            target=_safe_target(root,e['file'])
+            try:
+                if target is None or not target.is_file():
+                    continue
+                target.write_text(Path(backup).read_text(encoding='utf-8'),encoding='utf-8')
+            except Exception: pass
+        return {'success':False,'error':f'Patch application failed and rollback was attempted: {exc}'}
+    p['status']='applied'; p['backups']=backups; save(p)
+    return {'success':True,'proposal_id':pid,'approval_id':approval['id'],'backups':backups,'verification_required':True}
+
+def rollback(pid):
+    p=load(pid)
+    if not p or p.get('status')!='applied': return {'success':False,'error':'Proposal is not applied'}
+    backups=p.get('backups') or []
+    if len(backups)!=len(p.get('edits') or []):
+        return {'success':False,'error':'Backup set is incomplete; refusing rollback'}
+    root=Path(p.get('project','')).expanduser().resolve()
+    if not root.is_dir() or not _allowed_project(root):
+        return {'success':False,'error':'Project is outside configured workspace'}
+    restored=[]
+    try:
+        for e,backup in zip(p['edits'],backups):
+            if not isinstance(e,dict) or not isinstance(e.get('file'),str):
+                return {'success':False,'error':'Invalid edit in rollback metadata'}
+            target=_safe_target(root,e['file'])
+            backup_path=Path(backup).resolve()
+            if target is None or not target.is_file():
+                return {'success':False,'error':f'Invalid rollback target: {e["file"]}'}
+            if not backup_path.is_file() or not within(backup_path,root):
+                return {'success':False,'error':f'Invalid backup path: {backup}'}
+            target.write_text(backup_path.read_text(encoding='utf-8'),encoding='utf-8')
+            restored.append(e['file'])
+    except Exception as exc:
+        return {'success':False,'error':f'Rollback failed: {exc}','restored':restored}
+    p['status']='rolled_back'; save(p)
+    return {'success':True,'proposal_id':pid,'restored':restored}
