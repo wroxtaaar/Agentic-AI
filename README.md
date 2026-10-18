@@ -1,74 +1,118 @@
-# Oracle VPS Agent
+# vps-agents
 
-A self-hosted multi-agent engineering control plane for managing software projects and services on an Oracle VPS.
+A small control plane that lets AI agents maintain the projects on your VPS **without** giving a model the keys.
+Models only ever edit a throwaway git worktree inside a locked-down container. Everything that touches your real
+checkout, containers or deploys is done by this program, after a policy check and (usually) your approval.
 
-## Agent team
-
-- **Architect** — plans work before execution and reviews the worker's report afterward.
-- **Worker/orchestrator** — uses repository and VPS tools to investigate and produce exact patch proposals.
-- **Specialists** — project discovery, research, coding, DevOps, Git, debugging, security review, QA/verification and memory. Each delegated specialist gets a bounded, read-only tool investigation and returns an evidence-backed report; the worker retains the full tool set for approved workflows.
-- **Verification** — runs bounded project-aware syntax, test and build checks.
-
-The architect, worker, and delegated specialists can use different model IDs or FreeLLMAPI fallback chains behind an OpenAI Chat Completions gateway. Specialists use `SPECIALIST_MODEL` when configured, otherwise the worker model chain. For coding tasks, the worker can create a detached Git worktree, edit files only inside that worktree, run bounded project-aware checks, repair failures, and submit a diff for approval. Applying the verified diff to the original checkout requires approval; committing and pushing remain separate approval-gated actions.
-
-## Free model gateway (FreeLLMAPI)
-
-The Docker stack runs [FreeLLMAPI](https://github.com/tashfeenahmed/freellmapi) as the local model gateway. Its dashboard/API is bound to VPS loopback at port 3001 and is not exposed publicly. The deploy workflow generates a persistent encryption key in the private VPS .env; do not rotate or delete it after provider keys have been saved.
-
-1. When you can access the VPS, create an SSH tunnel: `ssh -L 3001:127.0.0.1:3001 <vps-user>@<vps-host>`. Keep that terminal/session open and visit `http://127.0.0.1:3001` on the same device.
-2. Complete FreeLLMAPI first-run setup. If it asks for a setup code, retrieve it on the VPS with `cd ~/Agentic-AI && docker compose logs freellmapi`. Keep the dashboard credentials private.
-3. Add provider API keys for providers whose free tiers you want to use. FreeLLMAPI is open-source/free software, but upstream provider quotas and terms apply.
-4. Copy the unified API key from the dashboard. Put it in the VPS's private `~/Agentic-AI/.env` as `FREELLMAPI_API_KEY=...`. Then run `cd ~/Agentic-AI && docker compose up -d --force-recreate agent`.
-5. Start with `auto` model selection. Check the live catalogue at `http://127.0.0.1:3001/v1/models` through the tunnel and choose exact model IDs for `ARCHITECT_MODEL` and `WORKER_MODEL` after verifying tool/function-calling support. Put those IDs in the VPS .env and recreate the agent.
-
-The agent container overrides `OPENROUTER_API_KEY` with an empty value, so it will not silently fall back to a paid OpenRouter route. Until `FREELLMAPI_API_KEY` is configured and FreeLLMAPI has usable provider keys/models, agent model calls will fail rather than incur API charges. FreeLLMAPI routes/fails over only among providers and models configured in its dashboard; verify that each selected upstream is genuinely free before using it.
-
-## Safety model
-
-Read operations are available automatically. State-changing operations require an approval record. Source patches record exact old_text, new_text, target paths and SHA-256 snapshots. Applying a patch requires the snapshot to still match and creates a backup first.
-
-Container restarts also require approval. The generic shell is allowlisted and read-only. Docker and Git use dedicated tools. Sensitive files are blocked or redacted. Verification commands are bounded and project-aware.
-
-## VPS setup
-
-The deployment workflow updates the existing checkout and runs Python syntax checks and unit tests before starting the stack. For a manual agent-only install:
-
-```bash
-git clone https://github.com/wroxtaaar/Agentic-AI.git
-cd Agentic-AI
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-nano .env
-python -m uvicorn app:app --host 127.0.0.1 --port 8787
+```
+you ──HTTP──> API ──> job queue ──> engine ──> sandbox container (worker edits worktree, tests run)
+                          ▲            │ policy: tier + preconditions
+ monitor ─incident jobs───┘            ├─> approval (bound to the exact commit) ──> you
+                                       └─> executors: merge → deploy → health check → auto-rollback
 ```
 
-Use Tailscale or another private network for agent access. Do not expose the raw control API publicly.
+## Status (read this first)
 
-## API
+Built and tested here (60+ tests, real git repos, stubbed model): policy matrix, job state machine, approvals bound to
+commit SHA, worktree/merge/rollback safety, diff vetting (secrets, symlinks), repair loop, review verdict gate,
+incident monitor, HTTP API + auth, redaction, role/persona loading, gateway probe.
 
-- GET /health
-- GET /api/status
-- POST /api/chat
-- GET /api/approvals
-- POST /api/approvals/{id}/approve
-- POST /api/approvals/{id}/reject
-- POST /api/proposals/{id}/approve
-- POST /api/proposals/{id}/apply
-- POST /api/actions/{id}/execute
-- POST /api/actions/docker/{id}/execute
-- POST /api/actions/restart-container
+**Not verified yet — needs your VPS:**
+1. **A real Docker run.** `DockerSandbox` is unit-tested for its arguments only (no daemon was available).
+2. **A real model worker.** `worker.command` is deliberately unset: pick the coding agent after `python -m vpsagents.probe`.
+3. **Real FreeLLMAPI behaviour** (rate limits, tool-calling quality per model).
 
-## Example tasks
+Run `vpsagents check --config config.yaml` to see what's missing on your machine.
 
-- Check all my projects and tell me which ones look unhealthy.
-- Investigate why torrent-studio is failing.
-- Fix the crash in FinanceSMSTracker and prepare a patch.
-- Check Docker containers and find anything using too much memory.
+## Autonomy tiers (per project)
 
-The agent investigates first, presents evidence, and requires approval before mutations. For coding tasks, it creates a detached worktree, edits and tests there, retries failed checks for up to three edit/verify cycles, then produces a diff for approval. Applying the diff requires approval and reruns verification; a failed post-apply check triggers a reverse-patch rollback attempt. This does not commit or push. Docker start/restart/stop, Git commits, durable memory writes, and exact source patches are approval-gated.
+| tier | meaning | start change | apply to checkout | deploy / restart |
+|---|---|---|---|---|
+| 0 | observe | denied | denied | denied |
+| 1 | propose | **approval** | approval | approval |
+| 2 | assisted | auto | approval | approval |
+| 3 | trusted | auto | **auto if** verified + review `APPROVE` | **auto if** health check configured; failed deploy auto-rolls back |
 
-## Continuous VPS monitoring (optional)
+Read-only jobs (investigate, incident, security_review) run at every tier. At tier 3 an auto action silently
+**downgrades to approval** when its safety net is missing (no verify commands, reviewer didn't say `VERDICT: APPROVE`,
+no `health_url`). Never allowed at any tier: force-push, deleting branches/projects, reading secrets, touching production data.
 
-The monitoring worker checks Docker container status/health, resource thresholds, bounded recent error-log excerpts, HTTP health checks, incident deduplication, and email alerts on incident/recovery transitions. See [monitoring/README.md](monitoring/README.md). Keep SMTP credentials in a private .env.monitor; never commit secrets. The monitor uses a private Docker socket proxy configured for GET-only API requests and does not perform restarts or deployments.
+## Safety design
+
+- **Sandbox**: `--cap-drop ALL`, `no-new-privileges`, read-only root, pids/memory/cpu limits, no docker socket, no host
+  home, exactly one worktree mounted (`:ro` for read-only jobs). Workers reach only the model gateway network; verify
+  runs have **no network** unless the project opts in. Secrets go in via a 0600 env-file, never argv.
+- **The agent never runs git on your repo.** The control plane commits, refuses diffs that touch secrets/`.git`/symlinks,
+  and fast-forwards your checkout only if it is clean, on the default branch, and the commit equals what you approved.
+- **Approvals are single-use and bound** to the commit sha (apply), merged sha (deploy) or container (restart); any
+  change after approval requires a new one. They expire.
+- **Your checkout is never edited in place.** If you commit while a job runs, the job rebases, re-verifies and asks again.
+- **Rollback only undoes its own merge**: it resets only if HEAD is still the commit we created and the tree is clean.
+- **Commands are argv lists from your config**, never model-generated and never shell strings.
+- Everything leaving a sandbox is redacted. The API requires a bearer token (≥24 chars) and should stay on localhost/private network.
+- Run the control plane **on the host** (systemd), not in a container with the docker socket mounted; it needs docker only to
+  launch sandboxes, restart registered containers and run your deploy command.
+
+## Install
+
+```bash
+python3 -m venv .venv && . .venv/bin/activate && pip install -e .
+cp config/config.example.yaml config.yaml          # edit projects
+export VPSA_API_TOKEN=$(openssl rand -hex 24)
+export FREELLMAPI_API_KEY=...                      # from the FreeLLMAPI dashboard
+
+# model gateway reachable from sandboxes but with no internet of its own
+docker network create --internal vpsa-gateway
+docker network connect vpsa-gateway freellmapi      # freellmapi keeps its normal network for provider calls
+
+docker build -f docker/Dockerfile.agent -t vpsa-agent:latest .
+vpsagents check --config config.yaml
+vpsagents serve --config config.yaml                # API on 127.0.0.1:8787 + runner + monitor
+```
+
+Optional: `VPSA_TELEGRAM_TOKEN` + `VPSA_TELEGRAM_CHAT_ID` (or `VPSA_WEBHOOK_URL`) for approval/incident notifications.
+
+## Choosing the worker
+
+```bash
+python -m vpsagents.probe --base-url http://127.0.0.1:3001/v1 --key-env FREELLMAPI_API_KEY
+```
+Shows which gateway models return valid tool calls. Pick one coding agent that can run non-interactively against an
+OpenAI-compatible endpoint, install it in `docker/Dockerfile.agent`, and set `worker.command`. The env it receives:
+`LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` plus `OPENAI_*` aliases.
+
+## Using it
+
+```bash
+H="Authorization: Bearer $VPSA_API_TOKEN"; U=http://127.0.0.1:8787
+curl -H "$H" -d '{"project":"torrent-studio","kind":"change","task":"Fix the crash when the magnet link is empty","deploy":true}' $U/jobs
+curl -H "$H" $U/approvals                      # what is waiting for you (summary has diffstat, verify + review result)
+curl -H "$H" -X POST $U/approvals/<id>/approve # or /reject
+curl -H "$H" $U/jobs/<job id>                  # events, diff, verify log, review, result
+curl -H "$H" -d '{"project":"notes-app","kind":"investigate","task":"How does auth work?"}' $U/jobs
+curl -H "$H" -d '{"project":"torrent-studio","kind":"restart","task":"torrent-studio"}' $U/jobs
+```
+Job kinds: `change`, `investigate`, `incident`, `security_review`, `restart`. The monitor opens `incident` jobs itself
+(two consecutive failures, de-duplicated, cooldown) and notifies you; it never restarts anything.
+
+## Roles (from agency-agents)
+
+`src/vpsagents/roles/roles.yaml` maps roles to persona files vendored from
+[msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents) (MIT, see `roles/personas/LICENSE.agency-agents`).
+Personas are trimmed to mission / rules / workflow, then wrapped in constraints written for this system (no invented
+experience, no claims of unrun checks, no secrets). Roles: `engineer`, `tester`, `devops` (change) and `reviewer`,
+`investigator`, `sre`, `security`, `git` (read-only). Add a role by adding a persona file and a yaml entry.
+
+## Known limits / next steps
+
+- No web UI yet (curl/API only). A small approvals page + Telegram approve buttons would be the next convenience.
+- Failed jobs keep their worktree for inspection; there is no garbage collector yet.
+- Auto-restart on incident for tier-3 projects is not implemented (the monitor only triages).
+- `push` to a remote is intentionally not implemented; merges stay local until you push.
+- One running job per project; jobs for different projects run in parallel (`max_concurrent_jobs`).
+
+## Tests
+
+```bash
+PYTHONPATH=src:. python3 -m unittest discover -s tests -t .
+```
